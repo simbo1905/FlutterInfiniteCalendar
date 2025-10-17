@@ -1,19 +1,52 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+typedef LogListener = void Function(LogRecord record);
+
+class LogRecord {
+  LogRecord({
+    required this.level,
+    required this.action,
+    required this.details,
+    required this.message,
+  });
+
+  final LogLevel level;
+  final String action;
+  final Map<String, dynamic> details;
+  final String message;
+}
+
 enum LogLevel {
   info,
   debug,
 }
 
 class AppLogger {
+  static final List<LogListener> _listeners = [];
+  static final List<LogRecord> _history = [];
+
   static void log(LogLevel level, String action, Map<String, dynamic> details) {
     final timestamp = DateTime.now().toUtc().toIso8601String();
     final levelStr = level == LogLevel.info ? 'INFO' : 'DEBUG';
-    final detailsJson = jsonEncode(details);
+    final clonedDetails = jsonDecode(jsonEncode(details)) as Map<String, dynamic>;
+    final detailsJson = jsonEncode(clonedDetails);
     final message = '[$timestamp] [$levelStr] [$action] - $detailsJson';
     
     developer.log(message, name: 'MealPlanner');
+    final record = LogRecord(
+      level: level,
+      action: action,
+      details: clonedDetails,
+      message: message,
+    );
+    _history.add(record);
+    if (_history.length > 200) {
+      _history.removeAt(0);
+    }
+    for (final listener in _listeners) {
+      listener(record);
+    }
   }
 
   static void initState(Map<String, dynamic> persistentState) {
@@ -59,4 +92,22 @@ class AppLogger {
       'to': {'order': toOrder},
     });
   }
+
+  static void addListener(LogListener listener) {
+    _listeners.add(listener);
+  }
+
+  static void removeListener(LogListener listener) {
+    _listeners.remove(listener);
+  }
+
+  static void clearListeners() {
+    _listeners.clear();
+  }
+
+  static void clearHistory() {
+    _history.clear();
+  }
+
+  static List<LogRecord> get history => List.unmodifiable(_history);
 }

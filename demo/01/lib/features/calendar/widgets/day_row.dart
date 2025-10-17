@@ -51,6 +51,7 @@ class DayRow extends ConsumerWidget {
         final isDragTarget = candidateData.isNotEmpty;
         
         return GestureDetector(
+          key: ValueKey('day-${_dateKey(day.date)}'),
           onTap: () {
             ref.read(mealControllerProvider.notifier).setSelectedDay(day.date);
           },
@@ -140,7 +141,7 @@ class DayRow extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         if (index == day.meals.length) {
                           return Padding(
-                            key: const ValueKey('add_card'),
+                            key: ValueKey('add-${_dateKey(day.date)}'),
                             padding: const EdgeInsets.only(left: 8),
                             child: AddMealCard(onTap: onAddPressed),
                           );
@@ -148,7 +149,7 @@ class DayRow extends ConsumerWidget {
 
                         final meal = day.meals[index];
                         return ReorderableDelayedDragStartListener(
-                          key: ValueKey(meal.id),
+                          key: ValueKey('meal-${meal.id}'),
                           index: index,
                           child: LongPressDraggable<Map<String, dynamic>>(
                             data: {
@@ -196,5 +197,9 @@ class DayRow extends ConsumerWidget {
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _dateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 }

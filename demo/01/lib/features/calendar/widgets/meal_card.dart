@@ -92,6 +92,7 @@ class MealCard extends StatelessWidget {
               top: 4,
               right: 4,
               child: IconButton(
+                key: ValueKey('delete-${meal.id}'),
                 icon: Icon(
                   Icons.close,
                   size: 16,

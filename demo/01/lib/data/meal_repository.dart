@@ -5,15 +5,39 @@ import '../util/uuid_generator.dart';
 import '../util/app_logger.dart';
 
 class MealRepository {
-  MealRepository();
+  MealRepository({
+    Random? random,
+    Map<String, List<MealInstance>>? initialState,
+  })  : _random = random ?? Random(),
+        _initialState = initialState == null
+            ? null
+            : initialState.map(
+                (key, value) => MapEntry(
+                  key,
+                  value.map((meal) => meal.copyWith()).toList(),
+                ),
+              );
 
-  final _random = Random();
+  final Random _random;
+  final Map<String, List<MealInstance>>? _initialState;
   final Map<String, List<MealInstance>> _workingState = {};
   final Map<String, List<MealInstance>> _persistentState = {};
 
   List<MealTemplate> get templates => mealTemplates;
 
   void initialize(DateTime today) {
+    _workingState.clear();
+    _persistentState.clear();
+
+    if (_initialState != null && _initialState!.isNotEmpty) {
+      _initialState!.forEach((key, meals) {
+        _persistentState[key] = meals.map((m) => m.copyWith()).toList();
+        _workingState[key] = meals.map((m) => m.copyWith()).toList();
+      });
+      AppLogger.initState(_serializePersistentState());
+      return;
+    }
+
     final currentWeekStart = _startOfWeek(today);
     
     for (int weekOffset = 0; weekOffset <= 1; weekOffset++) {
