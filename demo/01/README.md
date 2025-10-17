@@ -25,14 +25,31 @@ All core requirements from SPEC.md have been successfully implemented:
 ✅ **Delete confirmation** - Dialog before removing meals
 ✅ **Week grouping** - Week headers with date ranges and week numbers
 ✅ **Current day highlighting** - Visual distinction for today's date
+✅ **Structured logging** - All user actions logged per SPEC Section 7
 
-### Minor Implementation Notes:
+### Implementation Notes:
 
 1. **Auto-scroll during drag**: The viewport auto-scroll when dragging near edges is handled by Flutter's built-in DragTarget behavior. A more sophisticated implementation could enhance this with programmatic scrolling.
 
-2. **Icon mapping**: Some SPEC icon names (e.g., "bowl", "nutrition") were mapped to the closest Material Icons equivalents (e.g., `breakfast_dining`, `apple`).
+2. **Icon mapping**: Some SPEC icon names (e.g., "bowl", "nutrition") were mapped to the closest Material Icons equivalents (e.g., `breakfast_dining`, `local_dining`).
 
 3. **Color gradients**: Meal card color tabs use a subtle vertical gradient for visual polish, as suggested in the spec.
+
+## 3. Logging Implementation
+
+The application implements structured logging according to SPEC.md Section 7. All logs are output to the developer console in the format:
+
+`[TIMESTAMP] [LEVEL] [ACTION] - {DETAILS}`
+
+### Logged Events:
+- **INIT_STATE** - Initial persistent state dump (DEBUG level)
+- **SCREEN_LOAD** - Calendar screen loads with reason ("Initial Load" or "Reset")
+- **ADD_MEAL** - When a meal is added with full meal instance data
+- **DELETE_MEAL** - When a meal is deleted with meal ID
+- **MOVE_MEAL** - Inter-day moves with from/to date and order
+- **REORDER_MEAL** - Intra-day reordering with date and order changes
+
+To view logs, open browser DevTools console when running on web, or check the console output when running on mobile.
 
 ## Running the Demo
 
@@ -42,3 +59,15 @@ flutter pub get
 flutter run -d chrome  # For web
 flutter run            # For mobile
 ```
+
+## Viewing Logs
+
+### Web
+1. Run `flutter run -d chrome`
+2. Open browser DevTools (F12)
+3. View Console tab for structured logs
+
+### Mobile
+1. Run `flutter run`
+2. Check terminal output for logs
+

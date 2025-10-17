@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../controllers/meal_controller.dart';
-import '../../models/meal_instance.dart';
-import '../../models/meal_template.dart';
-import '../../util/app_logger.dart';
-import 'widgets/week_section.dart';
-import 'widgets/add_meal_sheet.dart';
-import 'widgets/delete_confirmation_dialog.dart';
 
-class MealCalendarScreen extends ConsumerStatefulWidget {
-  const MealCalendarScreen({super.key});
+import '../../controllers/calendar_controller.dart';
+import '../../models/event_entry.dart';
+import '../../models/event_template.dart';
+import 'widgets/add_event_sheet.dart';
+import 'widgets/event_details_sheet.dart';
+import 'widgets/loading_week_placeholder.dart';
+import 'widgets/week_section.dart';
+
+class CalendarScreen extends ConsumerStatefulWidget {
+  const CalendarScreen({super.key});
 
   @override
-  ConsumerState<MealCalendarScreen> createState() => _MealCalendarScreenState();
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
+class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _weekKeys = {};
   bool _hasAlignedToCurrentWeek = false;
-  bool _hasLoggedInitialLoad = false;
 
   @override
   void initState() {
@@ -35,10 +35,9 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
   }
 
   void _handleScroll() {
-    final notifier = ref.read(mealControllerProvider.notifier);
+    final notifier = ref.read(calendarControllerProvider.notifier);
     final position = _scrollController.position;
     const threshold = 600.0;
-    
     if (position.extentAfter < threshold) {
       notifier.loadNextWeek();
     }
@@ -49,12 +48,7 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(mealControllerProvider);
-
-    if (!_hasLoggedInitialLoad && state.weeks.isNotEmpty) {
-      AppLogger.screenLoad('Initial Load');
-      _hasLoggedInitialLoad = true;
-    }
+    final state = ref.watch(calendarControllerProvider);
 
     if (!_hasAlignedToCurrentWeek && state.weeks.any((w) => w.index == 0)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -82,19 +76,18 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
           SliverAppBar(
             pinned: true,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            title: const Text('Meal Planner'),
+            title: const Text('Training calendar'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              onPressed: () {},
+              tooltip: 'Back',
+            ),
             actions: [
-              TextButton(
-                onPressed: _handleSave,
-                child: const Text('Save'),
-              ),
-              const SizedBox(width: 8),
+              TextButton(onPressed: _handleSave, child: const Text('Save')),
             ],
           ),
           if (state.weeks.isEmpty)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const SliverToBoxAdapter(child: LoadingWeekPlaceholder())
           else
             SliverList.builder(
               itemCount: state.weeks.length,
@@ -108,8 +101,8 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
                   key: key,
                   week: week,
                   onAddPressed: (day) => _openAddSheet(context, day),
-                  onMealDelete: _handleMealDelete,
                   onResetPressed: _handleReset,
+                  onCardTapped: _openEventDetails,
                 );
               },
             ),
@@ -129,22 +122,19 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
   }
 
   void _handleSave() {
-    ref.read(mealControllerProvider.notifier).saveCurrentState();
+    ref.read(calendarControllerProvider.notifier).saveCurrentState();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Meal plan saved')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Calendar saved.')));
   }
 
   void _handleReset() {
-    ref.read(mealControllerProvider.notifier).resetToSavedState();
+    ref.read(calendarControllerProvider.notifier).resetToSavedState();
     if (!mounted) return;
-    
-    AppLogger.screenLoad('Reset');
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Changes discarded')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Changes discarded.')));
     setState(() {
       _hasAlignedToCurrentWeek = false;
     });
@@ -152,53 +142,76 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
 
   Future<void> _openAddSheet(BuildContext context, DateTime day) async {
     final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(mealControllerProvider.notifier);
-    
-    notifier.setSelectedDay(day);
-    
-    final template = await showModalBottomSheet<MealTemplate>(
+    final notifier = ref.read(calendarControllerProvider.notifier);
+    final template = await showModalBottomSheet<EventTemplate>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
-        return AddMealSheet(day: day);
+        return AddEventSheet(day: day);
       },
     );
 
     if (template == null) return;
     if (!mounted) return;
-    
-    notifier.addMealFromTemplate(
+    final inserted = notifier.addEventFromTemplate(
       day: day,
       template: template,
     );
-    
     messenger.showSnackBar(
-      SnackBar(content: Text('Added ${template.title} to ${_formatDay(day)}')),
+      SnackBar(
+        content: Text('Added to ${day.day} ${_monthFor(day)}'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            notifier.removeEvent(day: day, event: inserted);
+          },
+        ),
+      ),
     );
   }
 
-  Future<void> _handleMealDelete(DateTime day, MealInstance meal) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _openEventDetails(DateTime day, CalendarEvent event) async {
+    final deleted = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
-        return DeleteConfirmationDialog(mealTitle: meal.title);
+        return EventDetailsSheet(event: event);
       },
     );
 
-    if (confirmed != true) return;
     if (!mounted) return;
-
-    final notifier = ref.read(mealControllerProvider.notifier);
-    notifier.removeMeal(day: day, meal: meal);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Meal removed')),
-    );
+    if (deleted == true) {
+      final notifier = ref.read(calendarControllerProvider.notifier);
+      notifier.removeEvent(day: day, event: event);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Entry removed.')));
+    }
   }
+}
 
-  String _formatDay(DateTime date) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[date.weekday - 1];
-  }
+String _monthFor(DateTime date) {
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return monthNames[date.month - 1];
 }

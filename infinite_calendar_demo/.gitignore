@@ -1,0 +1,38 @@
+# Flutter related ignores
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.vscode/
+.idea/
+build/
+*.iml
+*.log
+*.lock # Except pubspec.lock, which is usually committed
+
+# Android specific ignores
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/src/debug/
+android/app/build/
+
+# iOS specific ignores
+ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Runner.xcworkspace/xcuserdata/
+ios/Pods/
+ios/.generated/
+
+# macOS specific ignores
+.DS_Store
+
+# VS Code specific ignores
+.vscode/
+
+# Other common ignores
+*.swp
+*.swo
+*~
+.env
+.env.*

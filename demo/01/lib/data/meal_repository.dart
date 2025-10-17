@@ -2,6 +2,7 @@ import 'dart:math';
 import '../models/meal_template.dart';
 import '../models/meal_instance.dart';
 import '../util/uuid_generator.dart';
+import '../util/app_logger.dart';
 
 class MealRepository {
   MealRepository();
@@ -41,6 +42,25 @@ class MealRepository {
         _workingState[dateKey] = meals.map((m) => m.copyWith()).toList();
       }
     }
+    
+    AppLogger.initState(_serializePersistentState());
+  }
+
+  Map<String, dynamic> _serializePersistentState() {
+    final serialized = <String, dynamic>{};
+    _persistentState.forEach((date, meals) {
+      serialized[date] = meals.map((meal) => {
+        'id': meal.id,
+        'templateId': meal.templateId,
+        'date': _dateKey(meal.date),
+        'order': meal.order,
+        'title': meal.title,
+        'quantity': meal.quantity,
+        'color': '#${meal.color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
+        'icon': meal.icon.codePoint,
+      }).toList();
+    });
+    return serialized;
   }
 
   List<MealInstance> mealsForDay(DateTime day) {

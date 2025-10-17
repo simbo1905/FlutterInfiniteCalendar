@@ -1,94 +1,59 @@
 import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../data/meal_repository.dart';
-import '../models/meal_instance.dart';
-import '../models/meal_template.dart';
-import '../util/app_logger.dart';
 
-final mealRepositoryProvider = Provider<MealRepository>((ref) {
-  final repo = MealRepository();
-  repo.initialize(DateTime.now());
-  return repo;
+import '../data/mock_calendar_repository.dart';
+import '../models/event_entry.dart';
+import '../models/event_template.dart';
+
+final mockCalendarRepositoryProvider = Provider<MockCalendarRepository>((ref) {
+  return MockCalendarRepository();
 });
 
-final baseDateProvider = Provider<DateTime>((ref) {
-  return DateTime.now();
-});
+final todayProvider = Provider<DateTime>((ref) => DateTime.now());
 
-final mealControllerProvider =
-    NotifierProvider<MealController, CalendarState>(MealController.new);
+final calendarControllerProvider =
+    NotifierProvider<CalendarController, CalendarState>(CalendarController.new);
 
-class MealController extends Notifier<CalendarState> {
-  late final DateTime _baseDate;
-
+class CalendarController extends Notifier<CalendarState> {
   @override
   CalendarState build() {
-    _baseDate = ref.read(baseDateProvider);
-    
-    final weeks = <int, CalendarWeek>{};
-    
-    for (int offset = -1; offset <= 1; offset++) {
-      final weekStart = _startOfWeek(_baseDate).add(Duration(days: offset * 7));
-      final weekEnd = weekStart.add(const Duration(days: 6));
-      
-      final days = <CalendarDay>[];
-      for (int i = 0; i < 7; i++) {
-        final date = weekStart.add(Duration(days: i));
-        final meals = ref.read(mealRepositoryProvider).mealsForDay(date);
-        days.add(CalendarDay(date: date, meals: meals));
-      }
-
-      weeks[offset] = CalendarWeek(
-        index: offset,
-        start: weekStart,
-        end: weekEnd,
-        days: days,
-      );
-    }
-    
-    return CalendarState(
-      weekMap: weeks,
-      savedWeekMap: Map<int, CalendarWeek>.from(weeks).map(
-        (key, value) => MapEntry(key, _cloneWeek(value)),
-      ),
-      loadingOffsets: const {},
-      errorOffsets: const {},
-      selectedDay: _baseDate,
-    );
+    final initialState = CalendarState.initial();
+    Future.microtask(() async {
+      await loadInitialWeeks();
+    });
+    return initialState;
   }
 
-  MealRepository get _repository => ref.read(mealRepositoryProvider);
+  MockCalendarRepository get _repository =>
+      ref.read(mockCalendarRepositoryProvider);
 
-  Future<void> loadWeek({required int offset}) async {
-    if (state.loadingOffsets.contains(offset) || state.weekMap.containsKey(offset)) {
+  Future<void> loadInitialWeeks() async {
+    if (state.weeks.isNotEmpty) {
       return;
     }
 
+    await Future.wait([
+      loadWeek(offset: -1),
+      loadWeek(offset: 0),
+      loadWeek(offset: 1),
+    ]);
+  }
+
+  Future<void> loadWeek({required int offset}) async {
+    if (state.loadingOffsets.contains(offset)) {
+      return;
+    }
+
+    state = state.copyWith(
+      loadingOffsets: {...state.loadingOffsets, offset},
+      errorOffsets: {...state.errorOffsets}..remove(offset),
+    );
+
     try {
-      state = state.copyWith(
-        loadingOffsets: {...state.loadingOffsets, offset},
-        errorOffsets: {...state.errorOffsets}..remove(offset),
-      );
-
-      final weekStart = _startOfWeek(_baseDate).add(Duration(days: offset * 7));
-      final weekEnd = weekStart.add(const Duration(days: 6));
-      
-      final days = <CalendarDay>[];
-      for (int i = 0; i < 7; i++) {
-        final date = weekStart.add(Duration(days: i));
-        final meals = _repository.mealsForDay(date);
-        days.add(CalendarDay(date: date, meals: meals));
-      }
-
-      final week = CalendarWeek(
-        index: offset,
-        start: weekStart,
-        end: weekEnd,
-        days: days,
-      );
-
+      final week = await _repository.loadWeek(offsetFromToday: offset);
       final shouldUpdateSaved = !state.savedWeekMap.containsKey(week.index);
       state = state.insertWeek(week, updateSaved: shouldUpdateSaved);
     } catch (error) {
@@ -111,48 +76,35 @@ class MealController extends Notifier<CalendarState> {
     await loadWeek(offset: previous);
   }
 
-  MealInstance addMealFromTemplate({
+  CalendarEvent addEventFromTemplate({
     required DateTime day,
-    required MealTemplate template,
+    required EventTemplate template,
   }) {
     final offset = _offsetForDate(day);
     final week = state.weekMap[offset];
-    
-    final meal = _repository.addMealToDay(day: day, template: template);
-    
-    AppLogger.addMeal({
-      'id': meal.id,
-      'templateId': meal.templateId,
-      'date': _dateKey(meal.date),
-      'order': meal.order,
-      'title': meal.title,
-      'quantity': meal.quantity,
-      'color': '#${meal.color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
-      'icon': meal.icon.codePoint,
-    });
-    
     if (week == null) {
-      return meal;
+      return _repository.addEventToDay(day: day, template: template);
     }
 
     final dayIndex = week.days.indexWhere((d) => _isSameDay(d.date, day));
     if (dayIndex == -1) {
-      return meal;
+      return _repository.addEventToDay(day: day, template: template);
     }
 
+    final event = _repository.addEventToDay(day: day, template: template);
     final updatedDay = CalendarDay(
       date: day,
-      meals: _repository.mealsForDay(day),
+      events: _repository.eventsForDay(day),
     );
     final updatedWeek = _replaceDay(week, updatedDay);
     state = state.insertWeek(updatedWeek);
-    return meal;
+    return event;
   }
 
-  void moveMeal({
+  void moveEvent({
     required DateTime fromDay,
     required DateTime toDay,
-    required MealInstance meal,
+    required CalendarEvent event,
     int? insertIndex,
   }) {
     final fromOffset = _offsetForDate(fromDay);
@@ -172,43 +124,21 @@ class MealController extends Notifier<CalendarState> {
       return;
     }
 
-    final oldOrder = meal.order;
-    
-    _repository.moveMeal(
+    _repository.moveEventInstance(
       fromDay: fromDay,
       toDay: toDay,
-      meal: meal,
+      event: event,
       insertIndex: insertIndex,
     );
 
     final updatedFromDay = CalendarDay(
       date: fromDay,
-      meals: _repository.mealsForDay(fromDay),
+      events: _repository.eventsForDay(fromDay),
     );
     final updatedToDay = CalendarDay(
       date: toDay,
-      meals: _repository.mealsForDay(toDay),
+      events: _repository.eventsForDay(toDay),
     );
-    
-    final movedMeal = updatedToDay.meals.firstWhere((m) => m.id == meal.id);
-    final newOrder = movedMeal.order;
-
-    if (_isSameDay(fromDay, toDay)) {
-      AppLogger.reorderMeal(
-        mealId: meal.id,
-        date: _dateKey(fromDay),
-        fromOrder: oldOrder,
-        toOrder: newOrder,
-      );
-    } else {
-      AppLogger.moveMeal(
-        mealId: meal.id,
-        fromDate: _dateKey(fromDay),
-        fromOrder: oldOrder,
-        toDate: _dateKey(toDay),
-        toOrder: newOrder,
-      );
-    }
 
     if (fromOffset == toOffset) {
       final fromWeekWithSource = _replaceDay(fromWeek, updatedFromDay);
@@ -223,7 +153,7 @@ class MealController extends Notifier<CalendarState> {
     }
   }
 
-  void removeMeal({required DateTime day, required MealInstance meal}) {
+  void removeEvent({required DateTime day, required CalendarEvent event}) {
     final offset = _offsetForDate(day);
     final week = state.weekMap[offset];
     if (week == null) {
@@ -234,19 +164,18 @@ class MealController extends Notifier<CalendarState> {
     if (dayIndex == -1) {
       return;
     }
-    
-    _repository.removeMeal(day: day, meal: meal);
-    
-    AppLogger.deleteMeal(meal.id);
-    
+    _repository.removeEventInstance(day: day, event: event);
     final updatedDay = CalendarDay(
       date: day,
-      meals: _repository.mealsForDay(day),
+      events: _repository.eventsForDay(day),
     );
     state = state.insertWeek(_replaceDay(week, updatedDay));
   }
 
-  List<MealTemplate> templates() => _repository.templates;
+  List<EventTemplate> templates() => _repository.templates;
+
+  List<EventTemplate> searchTemplates(String query) =>
+      _repository.searchTemplates(query);
 
   void saveCurrentState() {
     _repository.saveSnapshot();
@@ -263,12 +192,8 @@ class MealController extends Notifier<CalendarState> {
     state = state.copyWith(weekMap: restored);
   }
 
-  void setSelectedDay(DateTime day) {
-    state = state.copyWith(selectedDay: day);
-  }
-
   int _offsetForDate(DateTime date) {
-    final baseMonday = _startOfWeek(_baseDate);
+    final baseMonday = _startOfWeek(ref.read(todayProvider));
     final targetMonday = _startOfWeek(date);
     final difference = targetMonday.difference(baseMonday).inDays;
     return difference ~/ 7;
@@ -284,11 +209,22 @@ class MealController extends Notifier<CalendarState> {
         })
         .toList(growable: false);
 
+    final total = updatedDays.fold<double>(0, (sum, day) {
+      final dayTotal = day.events.fold<double>(0, (inner, event) {
+        final numeric = double.tryParse(event.quantity.split(' ').first) ?? 0;
+        return inner + numeric;
+      });
+      return sum + dayTotal;
+    });
+
     return CalendarWeek(
       index: week.index,
       start: week.start,
       end: week.end,
       days: updatedDays,
+      totalLabel: total == 0
+          ? 'Total: —'
+          : 'Total: ${total.toStringAsFixed(1)} units',
     );
   }
 
@@ -302,10 +238,6 @@ class MealController extends Notifier<CalendarState> {
       Duration(days: normalized.weekday - DateTime.monday),
     );
   }
-
-  static String _dateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
 }
 
 class CalendarState {
@@ -314,7 +246,6 @@ class CalendarState {
     required Map<int, CalendarWeek> savedWeekMap,
     required this.loadingOffsets,
     required this.errorOffsets,
-    this.selectedDay,
   }) : weekMap = SplayTreeMap<int, CalendarWeek>.of(weekMap),
        savedWeekMap = SplayTreeMap<int, CalendarWeek>.of(savedWeekMap);
 
@@ -322,7 +253,6 @@ class CalendarState {
   final SplayTreeMap<int, CalendarWeek> savedWeekMap;
   final Set<int> loadingOffsets;
   final Set<int> errorOffsets;
-  final DateTime? selectedDay;
 
   List<CalendarWeek> get weeks => weekMap.values.toList(growable: false);
 
@@ -337,14 +267,12 @@ class CalendarState {
     Map<int, CalendarWeek>? savedWeekMap,
     Set<int>? loadingOffsets,
     Set<int>? errorOffsets,
-    DateTime? selectedDay,
   }) {
     return CalendarState(
       weekMap: weekMap ?? this.weekMap,
       savedWeekMap: savedWeekMap ?? this.savedWeekMap,
       loadingOffsets: loadingOffsets ?? this.loadingOffsets,
       errorOffsets: errorOffsets ?? this.errorOffsets,
-      selectedDay: selectedDay ?? this.selectedDay,
     );
   }
 
@@ -358,13 +286,12 @@ class CalendarState {
     return copyWith(weekMap: updatedMap, savedWeekMap: newSaved);
   }
 
-  factory CalendarState.initial({DateTime? selectedDay}) {
+  factory CalendarState.initial() {
     return CalendarState(
       weekMap: const {},
       savedWeekMap: const {},
       loadingOffsets: const {},
       errorOffsets: const {},
-      selectedDay: selectedDay ?? DateTime.now(),
     );
   }
 }
@@ -382,8 +309,8 @@ CalendarWeek _cloneWeek(CalendarWeek week) {
       .map(
         (day) => CalendarDay(
           date: day.date,
-          meals: day.meals
-              .map((meal) => meal.copyWith())
+          events: day.events
+              .map((event) => event.copyWith())
               .toList(growable: false),
         ),
       )
@@ -394,6 +321,7 @@ CalendarWeek _cloneWeek(CalendarWeek week) {
     start: week.start,
     end: week.end,
     days: clonedDays,
+    totalLabel: week.totalLabel,
   );
 }
 
