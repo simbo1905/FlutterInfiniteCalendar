@@ -1,138 +1,510 @@
-# Agent Validation Protocol for Bake-off Demos
+# Validation Protocol: Infinite Scrolling Meal Planner
 
-IMPORTANT: Kapture is only installed into Microsoft Edge Browser you can only use Kapture MCP with Edge Browser. 
+## Overview
 
-Never sleep for more than 10s once the first screen has loaded and anything taking more than that is a FAIL. 
+This document defines the validation requirements for any implementation of the Infinite Scrolling Meal Planner as specified in `SPEC.md`. 
 
-## 1. Introduction
+**Prerequisites**: Read `AGENTS.md` first to understand the project structure, monorepo layout, and automation architecture.
 
-This document outlines the standardized validation protocol for an AI agent to test and evaluate Flutter demo applications submitted to the "Infinite Scrolling Meal Planner" bake-off. The goal is to ensure each submission is rigorously and consistently tested against the `SPEC.md`.
+## Testing Approach
 
-The agent will follow a detailed, step-by-step procedure, documenting its findings and generating a final report with a grade for the submission.
+This protocol describes **behavioral test scenarios** that must be validated for any demo implementation. These tests can be executed:
 
-## 2. Invocation
+- **Manually** by a human tester following the steps below
+- **Automated** using Appium tests written in JavaScript
 
-The validation process is initiated via a slash command:
+### Automated Test Implementation
 
-`/validate [demo-id]`
+Each demo has its own isolated test suite under `automation/tests/<demo-number>/` containing demo-specific Appium test implementations. Tests are written in JavaScript using WebDriverIO and the Flutter Integration Driver.
 
--   **`[demo-id]`**: A two-digit number (e.g., `01`, `02`) corresponding to the demo folder located at `./demo/[demo-id]/`.
+**To run automated tests for a demo**:
 
-## 3. Phase 1: Setup & Initial Verification
+```bash
+# From repository root
+DEMO=01 mise run test
+```
 
-The agent must perform these steps to set up the test environment.
+This executes all test files in `automation/tests/01/` against the built APK for demo 01. Test results and screenshots are saved to `automation/screenshots/`.
 
--   [ ] **Step 3.1: Locate Project**
-    -   Navigate to the `./demo/[demo-id]/` directory.
-    -   Verify the presence of a Flutter project structure and a `README.md` file.
+**Important**: The test **scenarios** below are implementation-agnostic. Each demo's actual test code will vary based on the Flutter calendar component used, but all implementations must satisfy these behavioral requirements.
 
--   [ ] **Step 3.2: Install Dependencies**
-    -   Run `flutter pub get` within the project directory.
-    -   Report any errors.
+---
 
--   [ ] **Step 3.3: Launch Application**
-    -   Run the application using the Chrome web target: `flutter run -d chrome`.
-    -   Wait for the application to fully load in the browser.
+## Critical Path Tests
 
--   [ ] **Step 3.4: Initial Screenshot**
-    -   Resize the browser window to simulate an "iPhone 16" resolution: **393px width x 852px height**.
-    -   Take a full-page screenshot and save it as `initial_view.png`.
+**These two tests are make-or-break. If a demo cannot pass these, it is not worth pursuing further testing.**
 
--   [ ] **Step 3.5: Initial State Check and Logging Verification**
-    -   Verify that the calendar has opened to the current week of the current year.
-    -   Verify that the current day is visually highlighted.
-    -   Verify that mock meal data is present for the current and following week, as per the initial data generation rules in `SPEC.md`.
-    -   **Console Log Verification:**
-        -   Capture all console logs from the application start.
-        -   Verify the presence and correctness of the `INIT_STATE` log, ensuring it contains the full `persistentState` as defined in `SPEC.md`.
-        -   Verify the presence and correctness of the `SCREEN_LOAD` log with `"reason": "Initial Load"`.
+### Test 1: Trivial Test - Confirms Setup
+**Objective**: Verify the automation environment works and the application renders dynamic content.
 
-## 4. Phase 2: Visual & Layout Validation
+**Priority**: **CRITICAL** - Must pass before any other testing
 
-Compare `initial_view.png` against the reference `Screenshot.png` and the requirements in `SPEC.md`.
+**Steps**:
+1. Launch the application via Appium
+2. Wait for the calendar view to fully render
+3. Wait for mock meal data to load dynamically (this is async, not immediate)
+4. Count the total number of meal cards visible on screen
+5. Take a screenshot
 
--   [ ] **Step 4.1: Header Layout**
-    -   Check for the presence and correct placement of the "Save" and "Reset" buttons.
+**Expected Results**:
+- Application launches without crashes
+- Appium successfully connects to the Flutter app
+- Test waits successfully for dynamic content (cards) to render
+- At least one meal card is counted (per `SPEC.md` initial data requirements)
+- Screenshot is saved showing the rendered calendar with cards
+- Test completes within 30 seconds
 
--   [ ] **Step 4.2: Day Row Layout**
-    -   Verify the left-side date indicator format (Day of week, Date).
-    -   Verify the horizontal meal carousel on the right.
+**Why this is critical**: If this test fails, the Appium setup, Flutter integration, or app initialization is broken. There's no point testing drag-and-drop if basic rendering doesn't work.
 
--   [ ] **Step 4.3: Meal Card Styling**
-    -   Check for the colored left tab, icon, title, and quantity fields.
-    -   Verify the presence of the faint `[x]` delete button in the top-right corner.
-    -   Assess general styling: rounded corners, shadows, and overall aesthetic match.
+---
 
--   [ ] **Step 4.4: "+ Add" Card**
-    -   Verify the `+ Add` card is fixed to the rightmost position of each day's carousel.
-    -   Check that its styling is distinct from a regular meal card.
+### Test 2: Trivial DnD Sanity Test
+**Objective**: Verify both vertical (inter-day) and horizontal (intra-day) drag-and-drop functionality works at a basic level.
 
-## 5. Phase 3: Functional Validation
+**Priority**: **CRITICAL** - Must pass before considering this demo viable
 
-**General Logging Verification:** For every action performed in this phase (add, delete, reorder, move), the agent must capture and verify the corresponding console log message as defined in `SPEC.md`. Ensure the `TIMESTAMP`, `LEVEL`, `ACTION`, and `DETAILS` match the expected output and reflect the UI changes accurately.
+**Steps**:
 
--   [ ] **Step 5.1: Scrolling**
-    -   **Vertical:** Scroll down several screens. Does it load future weeks infinitely? Scroll up past the initial week. Does it load past weeks infinitely? Does the year number change correctly when scrolling from week 52 to 1 (and vice-versa)?
-    -   **Horizontal:** On a day with multiple cards, scroll the carousel left and right. Does it function correctly?
+**Part A: Vertical Drag (Move Between Days)**
+1. Wait for calendar to fully render with cards
+2. Identify a meal card on one day (e.g., Monday)
+3. Identify a target day (e.g., Tuesday - can be empty or populated)
+4. Capture "before" screenshot
+5. Drag the card from source day to target day
+6. Wait for UI to update
+7. Capture "after" screenshot
+8. Verify the card moved:
+   - Source day has one fewer card (or is now empty)
+   - Target day has the card (as first, last, or only card)
 
--   [ ] **Step 5.2: Delete a Card**
-    -   Click the `[x]` on an existing card.
-    -   **Verify:** A confirmation dialog appears.
-    -   Click "Delete".
-    -   **Verify:** The card is removed from the view.
+**Part B: Horizontal Drag (Reorder Within Day)**
+1. Find a day with at least 2 meal cards
+2. Note the initial order of the first two cards
+3. Capture "before" screenshot
+4. Drag the first card to the right past the second card
+5. Wait for UI to update
+6. Capture "after" screenshot
+7. Verify the cards are now in reversed order
 
--   [ ] **Step 5.3: Add a Card**
-    -   Find a day with no cards and click the `+ Add` card.
-    -   **Verify:** The "Add Meal Bottom Sheet" appears, showing meal templates.
-    -   Add a meal.
-    -   **Verify:** The sheet closes and the new card appears on the correct day.
-    -   On a day with existing cards, repeat the process.
-    -   **Verify:** The new card is added to the end of the list.
+**Expected Results**:
+- Both vertical and horizontal drag gestures are recognized (not interpreted as taps or swipes)
+- Cards visually follow the drag gesture
+- UI updates to reflect the new positions
+- Screenshots show clear before/after state changes
+- Console logs show `[MOVE_MEAL]` (for Part A) and `[REORDER_MEAL]` (for Part B) per `SPEC.md`
+- Test completes within 60 seconds
 
--   [ ] **Step 5.4: Reorder Cards (Horizontal Drag-and-Drop)**
-    -   Find a day with at least two cards.
-    -   Drag the first card and drop it after the second card.
-    -   **Verify:** The order of the cards in the UI is updated correctly.
+**Why this is critical**: Drag-and-drop is the hardest functionality to get working. If this test fails, the demo's calendar component doesn't support proper DnD, and debugging all the other tests will be wasted effort. All other meal management features (add, delete, save/reset) are comparatively trivial once DnD works.
 
--   [ ] **Step 5.5: Move Card (Vertical Drag-and-Drop)**
-    -   Drag a card from its original day and drop it onto a different day in the same week.
-    -   **Verify:** The card is removed from the source day and appears on the destination day.
-    -   Drag a card to the bottom edge of the screen.
-    -   **Verify:** The calendar auto-scrolls downwards.
-    -   Drop the card on a day in a future week.
-    -   **Verify:** The card is correctly moved.
+---
 
-## 6. Phase 4: State Management Validation (Save & Reset)
+## Standard Test Suite
 
-**General Logging Verification:** For every action performed in this phase (Save, Reset), the agent must capture and verify the corresponding console log message as defined in `SPEC.md`. Ensure the `TIMESTAMP`, `LEVEL`, `ACTION`, and `DETAILS` match the expected output and reflect the UI changes accurately.
+**Only proceed with these tests after Tests 1 and 2 pass reliably.** These tests validate the complete specification but are less likely to uncover showstopper issues. Each test should be as standalone as possible to facilitate independent debugging.
 
-This phase requires careful state checking with screenshots.
+### Test 3: Application Launch and Initial State
+**Objective**: Verify detailed initial state requirements from `SPEC.md`.
 
--   [ ] **Step 6.1: Test Reset Functionality**
-    1.  From the initial state, move a card from Monday to Tuesday.
-    2.  Take a screenshot (`reset_test_state_A.png`).
-    3.  Click the "Reset" button.
-    4.  **Verify:** The UI reverts to the initial state (card is back on Monday). Take a screenshot (`reset_test_state_B.png`) and compare it with `initial_view.png`.
+**Steps**:
+1. Launch the application
+2. Wait for calendar view to fully render
+3. Check the displayed week indicator
+4. Check for current day highlighting
+5. Examine visible meal cards across current and next week
 
--   [ ] **Step 6.2: Test Save and Reset Functionality**
-    1.  From the initial state, move a card from Wednesday to Thursday.
-    2.  Click the "Save" button.
-    3.  Take a screenshot of this new saved state (`save_test_state_A.png`).
-    4.  Make another change, e.g., delete a different card entirely.
-    5.  Click the "Reset" button.
-    6.  **Verify:** The UI reverts to the state when "Save" was pressed (the card is on Thursday), not the initial state. Take a screenshot (`save_test_state_B.png`) and confirm it matches `save_test_state_A.png`.
+**Expected Results**:
+- Calendar opens to the current week (matching system date)
+- Current day is visually highlighted or selected
+- Week indicator shows correct week number and year
+- Current week contains randomly generated meal cards
+- Following week contains randomly generated meal cards
+- Each meal card displays: colored tab, icon, title, and quantity (prep time)
 
-## 7. Phase 5: Reporting
+---
 
-After completing all phases, the agent must generate a `VALIDATION_REPORT.md` file in the demo's directory.
+### Test 4: Console Logging Verification
+**Objective**: Verify structured logging is implemented per `SPEC.md`.
 
--   **Header:** Include the Demo ID and the final grade.
--   **Checklist:** Copy the checklists from this protocol (`- [ ]`) and mark each item with `[x]` for pass or `[ ]` for fail.
--   **Notes:** For any failed step, provide a detailed explanation of what went wrong, referencing screenshots where applicable.
--   **Screenshots:** List all generated screenshots (`initial_view.png`, `reset_test_state_A.png`, etc.) as evidence.
--   **Final Grade:** Assign a grade (A, B, C, D, F) based on the number of passed checks, with significant weight on core functionality (drag-drop, state management).
-    -   **A:** 95-100% pass rate. Fully functional and polished.
-    -   **B:** 80-94% pass rate. Mostly functional, minor visual or interaction bugs.
-    -   **C:** 60-79% pass rate. Core features work, but with significant bugs.
-    -   **D:** 40-59% pass rate. Major features are broken or missing.
-    -   **F:** <40% pass rate. Unusable or fails to run.
+**Steps**:
+1. Open browser/device developer console
+2. Review logs from application startup
+3. Verify log format and required entries
+
+**Expected Results**:
+- `[TIMESTAMP] [DEBUG] [INIT_STATE]` log present with full `persistentState` dump
+- `[TIMESTAMP] [INFO] [SCREEN_LOAD]` log present with `"reason": "Initial Load"`
+- All logs follow format: `[TIMESTAMP] [LEVEL] [ACTION] - {DETAILS}`
+- Timestamps are in ISO 8601 format
+
+---
+
+### Test 5: Vertical Scrolling - Future Weeks
+**Objective**: Verify infinite scrolling loads future weeks dynamically.
+
+**Steps**:
+1. From initial state, scroll down continuously
+2. Observe new weeks loading
+3. Continue scrolling for at least 10 weeks into the future
+4. Check week number and year transitions
+
+**Expected Results**:
+- Calendar smoothly loads future weeks on demand
+- Week numbers increment correctly
+- Year changes appropriately when crossing from Week 52 to Week 1
+- No performance degradation or crashes
+
+---
+
+### Test 6: Vertical Scrolling - Past Weeks
+**Objective**: Verify infinite scrolling loads past weeks dynamically.
+
+**Steps**:
+1. From initial state, scroll up continuously
+2. Observe past weeks loading
+3. Continue scrolling for at least 10 weeks into the past
+4. Check week number and year transitions
+
+**Expected Results**:
+- Calendar smoothly loads past weeks on demand
+- Week numbers decrement correctly
+- Year changes appropriately when crossing from Week 1 to Week 52
+- No performance degradation or crashes
+
+---
+
+### Test 7: Horizontal Scrolling - Meal Carousel
+**Objective**: Verify day carousels scroll horizontally when multiple cards are present.
+
+**Steps**:
+1. Find a day with at least 3 meal cards
+2. Scroll the meal carousel left and right
+3. Observe card visibility and behavior
+
+**Expected Results**:
+- Carousel scrolls smoothly in both directions
+- Cards remain properly aligned
+- "+ Add" card stays fixed at rightmost position
+- No cards are cut off or overlapping incorrectly
+
+---
+
+### Test 8: Add Meal to Empty Day
+**Objective**: Verify meals can be added to days with no existing cards.
+
+**Steps**:
+1. Find a day with zero meal cards
+2. Tap the "+ Add" card on that day
+3. Verify bottom sheet appears
+4. Select a meal template (e.g., "Fish and Chips")
+5. Tap the "+" button next to the template
+
+**Expected Results**:
+- Bottom sheet displays all meal templates from `SPEC.md`
+- After selection, bottom sheet closes
+- New meal card appears on the selected day
+- Card displays correct icon, title, color, and quantity
+- `[TIMESTAMP] [INFO] [ADD_MEAL]` log appears with full meal instance data
+
+---
+
+### Test 9: Add Meal to Populated Day
+**Objective**: Verify meals can be added to days that already have cards.
+
+**Steps**:
+1. Find a day with at least one existing meal card
+2. Tap the "+ Add" card
+3. Select a different meal template
+4. Add the meal
+
+**Expected Results**:
+- New card added to end of carousel (before "+ Add")
+- Existing cards remain unchanged
+- Carousel scrolls if necessary to show new card
+- `[ADD_MEAL]` log appears
+
+---
+
+### Test 10: Delete Meal Card with Confirmation
+**Objective**: Verify meals can be deleted with user confirmation.
+
+**Steps**:
+1. Locate any meal card
+2. Tap the "[x]" delete button
+3. Observe confirmation dialog
+4. Tap "Delete" to confirm
+
+**Expected Results**:
+- Confirmation dialog appears with "Cancel" and "Delete" options
+- After confirming, card is removed from UI
+- Other cards on same day shift/reflow appropriately
+- `[TIMESTAMP] [INFO] [DELETE_MEAL]` log appears with meal ID
+
+---
+
+### Test 11: Cancel Delete Operation
+**Objective**: Verify delete confirmation can be cancelled.
+
+**Steps**:
+1. Tap "[x]" delete button on a meal card
+2. Tap "Cancel" in confirmation dialog
+
+**Expected Results**:
+- Dialog closes
+- Card remains unchanged
+- No delete log appears
+
+---
+
+### Test 12: Move Card Between Days (Same Week)
+**Objective**: Verify vertical drag-and-drop between different days.
+
+**Note**: This repeats Test 2 Part A but as a standalone test for debugging app behavior (not test infrastructure).
+
+**Steps**:
+1. Wait for calendar to fully render
+2. Find a card on one day (e.g., Monday)
+3. Note card details
+4. Capture "before" screenshot
+5. Drag card to a different day in the same week (e.g., Wednesday)
+6. Release to drop
+7. Wait for UI update
+8. Capture "after" screenshot
+
+**Expected Results**:
+- Card visually follows drag gesture
+- Card disappears from source day
+- Card appears in target day
+- `[TIMESTAMP] [INFO] [MOVE_MEAL]` log shows correct dates and order indices
+
+---
+
+### Test 13: Move Card to Empty Day
+**Objective**: Verify cards can be moved to days with no existing cards.
+
+**Steps**:
+1. Find an empty day (zero cards)
+2. Find a card on a different day
+3. Drag card to empty day
+4. Drop
+
+**Expected Results**:
+- Card moves successfully
+- Card is only card on target day
+- Source day updates correctly
+- `[MOVE_MEAL]` log appears
+
+---
+
+### Test 14: Move Card to Future Week (Auto-scroll)
+**Objective**: Verify drag-to-edge auto-scrolling and cross-week movement.
+
+**Steps**:
+1. Find a card in currently visible week
+2. Press and hold card
+3. Drag to bottom edge of viewport
+4. Hold at edge until calendar auto-scrolls down
+5. Continue to day in future week
+6. Drop
+
+**Expected Results**:
+- Calendar auto-scrolls downward smoothly when card held at bottom edge
+- Card can be dropped on day in future week
+- Card moves from source to target week correctly
+- `[MOVE_MEAL]` log reflects cross-week move
+
+---
+
+### Test 15: Move Card to Past Week (Auto-scroll)
+**Objective**: Verify upward auto-scrolling for past week movement.
+
+**Steps**:
+1. Find a card in currently visible week
+2. Drag to top edge of viewport
+3. Hold until calendar auto-scrolls up
+4. Drop on day in past week
+
+**Expected Results**:
+- Calendar auto-scrolls upward smoothly
+- Card moves to past week correctly
+- `[MOVE_MEAL]` log appears with correct date change
+
+---
+
+### Test 16: Reorder Cards Within Same Day
+**Objective**: Verify horizontal drag-and-drop reordering.
+
+**Note**: This repeats Test 2 Part B but as a standalone test for debugging app behavior.
+
+**Steps**:
+1. Find a day with at least 2 meal cards
+2. Note initial order
+3. Capture "before" screenshot
+4. Drag first card to right past second card
+5. Release to drop
+6. Wait for UI update
+7. Capture "after" screenshot
+
+**Expected Results**:
+- Card follows drag gesture horizontally
+- After drop, cards are reordered
+- New order persists
+- `[TIMESTAMP] [INFO] [REORDER_MEAL]` log shows old and new order indices
+
+---
+
+### Test 17: Reorder Cards - Multiple Positions
+**Objective**: Verify cards can be dragged to any carousel position.
+
+**Steps**:
+1. Find a day with at least 3 meal cards
+2. Drag third card to first position
+3. Verify reordering
+4. Drag second card to last position
+5. Verify reordering
+
+**Expected Results**:
+- Each drag operation updates order correctly
+- UI reflects changes immediately
+- Multiple `[REORDER_MEAL]` logs appear, one per operation
+
+---
+
+### Test 18: Reset to Initial State
+**Objective**: Verify Reset button reverts to initial state before any saves.
+
+**Steps**:
+1. From initial state, move a card from Monday to Tuesday
+2. Verify the move
+3. Tap "Reset" button
+4. Observe UI
+
+**Expected Results**:
+- Card returns to original Monday position
+- UI matches initial state exactly
+- `[TIMESTAMP] [INFO] [SCREEN_LOAD]` log with `"reason": "Reset"`
+- No changes persist after reset
+
+---
+
+### Test 19: Save State and Reset to Saved State
+**Objective**: Verify Save creates new persistent state and Reset reverts to it.
+
+**Steps**:
+1. From initial state, move card from Monday to Tuesday
+2. Tap "Save" button
+3. Make another change: move different card from Wednesday to Thursday
+4. Tap "Reset" button
+
+**Expected Results**:
+- After Reset, first change persists (Monday→Tuesday remains)
+- Second change reverted (Wednesday→Thursday undone)
+- UI shows state when "Save" was pressed
+- `[SCREEN_LOAD]` log with `"reason": "Reset"`
+
+---
+
+### Test 20: Multiple Save Operations
+**Objective**: Verify Save can be pressed multiple times.
+
+**Steps**:
+1. Make change A (move a card)
+2. Tap "Save"
+3. Make change B (delete a card)
+4. Tap "Save"
+5. Make change C (add a card)
+6. Tap "Reset"
+
+**Expected Results**:
+- After Reset, changes A and B persist
+- Change C reverted
+- Reset always reverts to most recent Save point
+
+---
+
+### Test 21: Reset Without Save
+**Objective**: Verify Reset works when no Save has been performed.
+
+**Steps**:
+1. Launch application
+2. Make several changes (add, move, delete cards)
+3. Do NOT tap "Save"
+4. Tap "Reset"
+
+**Expected Results**:
+- All changes reverted
+- Calendar returns to initial generated state
+- No user changes persist
+
+---
+
+### Test 22: Full Meal Planning Workflow
+**Objective**: Verify realistic workflow combining multiple operations.
+
+**Steps**:
+1. Launch app
+2. Add "Oatmeal" to Monday
+3. Add "Chicken Salad" to Monday
+4. Reorder Monday's cards (swap positions)
+5. Save the state
+6. Move "Oatmeal" from Monday to Friday
+7. Add "Fish and Chips" to Wednesday
+8. Delete "Chicken Salad" from Monday
+9. Reset
+
+**Expected Results**:
+- Each operation works correctly in sequence
+- After Reset, state shows:
+  - Monday has "Oatmeal" and "Chicken Salad" in swapped order (saved state)
+  - Friday has no "Oatmeal" (move reverted)
+  - Wednesday has no "Fish and Chips" (add reverted)
+  - Monday still has "Chicken Salad" (delete reverted)
+
+---
+
+### Test 23: Drag and Drop Error Handling
+**Objective**: Verify drag operations handle edge cases gracefully.
+
+**Steps**:
+1. Try dragging card and releasing outside calendar area
+2. Try dragging card and pressing "Back" or "Home" mid-drag
+3. Try dragging while rapidly scrolling
+
+**Expected Results**:
+- Invalid drops cancel operation (card returns to source)
+- No crashes or UI corruption
+- State remains consistent
+
+---
+
+## Grading Criteria
+
+Tests are evaluated on a pass/fail basis. Final grade is calculated as:
+
+- **A (95-100% pass)**: All tests pass, polished UX, no bugs
+- **B (80-94% pass)**: Core functionality works, minor visual or interaction issues
+- **C (60-79% pass)**: Core features functional but with significant bugs
+- **D (40-59% pass)**: Major features broken or incomplete
+- **F (<40% pass)**: Application unusable or fails to launch
+
+**CRITICAL tests** (must pass to continue any testing):
+- Test 1: Trivial Test - Confirms Setup
+- Test 2: Trivial DnD Sanity Test
+
+**High priority tests** (must pass for C or higher):
+- Test 3: Application Launch and Initial State
+- Test 8: Add Meal to Empty Day
+- Test 10: Delete Meal Card
+- Test 12: Move Card Between Days
+- Test 16: Reorder Cards Within Same Day
+- Test 19: Save and Reset
+
+**Standard tests** (must pass for B or higher):
+- All remaining Tests 4-23
+
+**Note**: If Tests 1 and 2 fail, **stop testing immediately**. The demo is not viable and further debugging would waste time. Focus on getting the critical path working first.
+
+---
+
+## Cross-Reference Verification
+
+**Test Data Consistency**: The test scenarios above have been cross-checked with the demo implementation code. All meal names referenced in the validation tests (e.g., "Oatmeal", "Fish and Chips", "Chicken Salad", "Apple Slices", "Herbal Tea", "Scrambled Eggs") exactly match the meal templates defined in the demo code and SPEC.md. The implementation uses the standardized meal template data as specified, ensuring validation tests will execute correctly against any demo implementation.

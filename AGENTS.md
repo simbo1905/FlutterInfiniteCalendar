@@ -1,66 +1,274 @@
-# Gemini Code Assistant Context
+You're absolutely right! Let me revise the AGENTS.md to reflect that tests are **demo-specific** and self-contained in their own folders, while keeping the general framework generic.
 
-## Project Overview
+# Agent Context: Infinite Scrolling Meal Planner Testing
 
-This project is a Flutter-based mobile application called "Infinite Scrolling Meal Planner". It's a demo app designed to showcase a highly interactive and intuitive calendar interface for planning weekly meals. The application is intended to be cross-platform, targeting both **Web** and **iOS**.
+## Project Structure
 
-The core features of the application include:
+This is a **monorepo** containing multiple Flutter demo attempts under `./demo/01/`, `./demo/02/`, etc. Each demo explores different calendar library implementations to find the best solution for the Infinite Scrolling Meal Planner specification.
 
-- An infinitely scrolling weekly calendar.
-- Horizontally scrolling carousels of "meal cards" for each day.
-- Drag-and-drop functionality to move meal cards between days and reorder them within a day.
-- A state management system with "Save" and "Reset" functionality to manage a working state and a persistent state of the meal plan.
-- A modal bottom sheet for adding new meals from a predefined list of templates.
+The automation testing infrastructure lives at the **repository root** in:
+- `./automation/` - Appium test framework (JavaScript/Node.js) - shared infrastructure
+- `./automation/tests/01/` - Tests specific to demo 01
+- `./automation/tests/02/` - Tests specific to demo 02
+- `./mise.toml` - Dependency management and task orchestration
 
-The project uses the Riverpod package for state management and follows a feature-based architecture, with a clear separation of concerns between UI, controllers, data, and models.
+**Key principle:** The automation **framework** is reusable infrastructure. The **tests themselves are demo-specific** because each demo may use different Flutter calendar components with different widget structures, keys, and behaviors.
 
-## Building and Running
+When a winning demo is identified, its test folder (e.g., `./automation/tests/01/`) will be copied to other repositories and adapted for their specific implementations.
 
-### Prerequisites
+## Target Platform
 
-- Flutter SDK (3.35+)
+We are **testing exclusively on Android** via Android Studio emulator. This is the baseline platform verification strategy:
 
-### Project Setup
+- ✅ **Necessary but not sufficient**: If it works on Android, the pure Flutter logic should port to iOS and Web with minimal adaptation
+- ✅ **Most native testing experience**: Android emulator + Appium provides the most stable automation environment
+- ✅ **Feature validation focus**: Proves drag-and-drop, state management, and card manipulation logic works
 
-1.  **Install dependencies:**
-    ```bash
-    flutter pub get
-    ```
+## Verification: New Checkout Setup
 
-2.  **Analyze the code:**
-    ```bash
-    flutter analyze
-    ```
+After cloning this repository, verify the toolchain is correctly installed:
 
-### Running the Application
+### 1. Install Dependencies
 
--   **Mobile (iOS/Android):**
-    ```bash
-    flutter run
-    ```
+```bash
+# From repository root
+cd /path/to/FlutterInfiniteCalendar
 
--   **Web (Chrome):**
-    ```bash
-    flutter config --enable-web # One-time setup
-    flutter run -d chrome
-    ```
+# Install mise-managed tooling (Node.js)
+mise install
 
-### Running Tests
+# Bootstrap Appium automation workspace
+mise run bootstrap
 
--   **Run all tests:**
-    ```bash
-    flutter test
-    ```
+# Verify Appium server can start
+mise run appium
+# Should show: "Available drivers: flutter-integration@2.0.3"
+# Press Ctrl+C to stop
+```
 
--   **Run web tests:**
-    ```bash
-    flutter test --platform=chrome
-    ```
+### 2. Verify Flutter Integration Driver
 
-## Development Conventions
+```bash
+# Check driver installation
+npx appium driver list
 
--   **State Management:** The project uses `flutter_riverpod` for state management. The main application logic is centralized in `lib/controllers/calendar_controller.dart`.
--   **Architecture:** The project follows a feature-based architecture, with widgets, controllers, data, and models organized into separate directories.
--   **Data Model:** The application uses a `MealInstance` model to represent meals on the calendar, which are created from `MealTemplate` blueprints. The full data model and mock data are defined in `SPEC.md`.
--   **Immutability:** The state management approach relies on immutable data structures. When the state is modified, a new state object is created.
--   **Testing:** The project includes unit and widget tests. Tests for the controller and widgets can be found in the `test/` directory.
+# Should show:
+# ✔ flutter-integration@2.0.3 [installed (npm)]
+```
+
+### 3. Verify Android Environment
+
+```bash
+# Check Flutter recognizes Android setup
+flutter doctor -v
+
+# Should show:
+# [✓] Android toolchain - develop for Android devices
+# [✓] Android Studio
+
+# List available emulators
+emulator -list-avds
+
+# Should show at least one AVD (e.g., "Medium_Phone_API_36.1" or "Pixel_6_API_33")
+```
+
+### 4. Build and Run Demo on Emulator
+
+```bash
+# Start emulator (in background)
+emulator -avd <your-avd-name> &
+
+# Wait ~30 seconds for boot
+
+# Navigate to a demo
+cd demo/01
+
+# Run the Flutter app
+flutter run
+
+# App should launch on emulator successfully
+# Press 'q' to quit
+```
+
+If all four steps succeed, the environment is ready for automation testing.
+
+## Test Architecture
+
+Tests are written in **JavaScript using WebDriverIO** and reside in **demo-specific folders** under `automation/tests/`. Each demo gets its own isolated test directory:
+
+```
+automation/
+├── package.json           # Shared dependencies
+├── appium.config.cjs      # Shared Appium config
+├── screenshots/           # Test evidence output
+└── tests/
+    ├── 01/                # Tests for demo/01/
+    │   ├── 01-hello-world.test.js
+    │   └── 02-drag-drop.test.js
+    ├── 02/                # Tests for demo/02/
+    │   ├── 01-hello-world.test.js
+    │   └── 02-drag-drop.test.js
+    └── ...
+```
+
+**Why demo-specific folders?**
+- Different demos may use different Flutter calendar packages
+- Widget keys, selectors, and hierarchies will vary between implementations
+- Each demo's tests are **self-contained** and don't depend on other demos' test code
+- Winning demo's test folder becomes the portable asset
+
+### Test Execution Workflow
+
+1. **Terminal 1**: Start Appium server
+   ```bash
+   cd /path/to/FlutterInfiniteCalendar
+   mise run appium
+   # Leave running
+   ```
+
+2. **Terminal 2**: Build test-enabled APK for target demo
+   ```bash
+   cd /path/to/FlutterInfiniteCalendar
+   DEMO=01 mise run build-demo
+   ```
+
+3. **Terminal 3**: Run tests for specific demo
+   ```bash
+   cd /path/to/FlutterInfiniteCalendar
+   DEMO=01 mise run test
+   # This runs all tests in automation/tests/01/
+   ```
+
+## Test Implementation Guide
+
+When creating tests for a new demo, create a new numbered directory under `automation/tests/` and implement the following baseline tests. Each demo must satisfy the same **behavioral requirements** from `SPEC.md`, but the **test implementation** will differ based on the actual widgets and keys used.
+
+### Test 1: Hello World - Card Count Verification
+
+**File:** `automation/tests/<demo-number>/01-hello-world.test.js`
+
+**Purpose:** Baseline smoke test that verifies the Flutter app launches successfully and the calendar screen renders with dynamically loaded meal cards.
+
+**Behavior:**
+1. Connect to the Flutter app via Appium
+2. **Wait for dynamic content to load** - The calendar screen fetches and renders mock meal data asynchronously after the app initializes
+3. Count the total number of meal cards visible on screen
+4. Assert that at least one card is present (per `SPEC.md` initial data requirements)
+5. Capture a screenshot for visual verification
+6. Log the card count to console
+
+**Critical requirement:** This test must implement proper wait strategies because the card data is **not immediately available** on app launch. The test must poll or wait for widgets to appear before attempting to count them.
+
+**Success criteria:**
+- App launches without errors
+- Test waits successfully for cards to render
+- Accurate card count returned (should match `SPEC.md` mock data for current + next week)
+- Screenshot saved to `automation/screenshots/<demo-number>-hello-world.png`
+
+**Demo-specific adaptations needed:**
+- Widget keys/selectors for finding meal cards (varies by calendar component used)
+- Wait timeouts (may differ based on rendering performance)
+- Locator strategies (accessibility IDs, resource IDs, or custom keys)
+
+### Test 2: Drag and Drop - Card Movement Verification
+
+**File:** `automation/tests/<demo-number>/02-drag-drop.test.js`
+
+**Purpose:** Validates the core drag-and-drop functionality by moving a meal card from a populated day to an empty day.
+
+**Behavior:**
+1. Connect to the Flutter app and wait for calendar to fully render
+2. **Identify source card** - Locate a specific meal card on a day that has at least one card
+3. **Identify target date** - Locate an empty day row (a day with zero cards)
+4. **Capture "before" state** - Take screenshot showing initial card positions
+5. **Execute drag operation** - Use W3C Actions API to:
+   - Get the center coordinates of the source card
+   - Get the center coordinates of the target day's drop zone
+   - Perform pointer down → move → up gesture sequence with appropriate timing (300ms pause after down, 1000-1500ms move duration)
+6. **Wait for state update** - Pause to allow Flutter to process the drag and update UI
+7. **Capture "after" state** - Take screenshot showing final card positions
+8. **Verify card moved** - Assert that:
+   - Source day now has one fewer card
+   - Target day now has exactly one card
+   - Console logs show `MOVE_MEAL` action per `SPEC.md` logging requirements
+
+**Critical requirements:**
+- Must wait for rendering after each screen interaction
+- Drag gesture timing is crucial (not tap/swipe)
+- Coordinates must be calculated dynamically from element positions, never hard-coded
+- Must handle async state updates with explicit waits
+
+**Success criteria:**
+- Card successfully moves from source to target day
+- UI reflects the state change accurately
+- Before/after screenshots saved to `automation/screenshots/<demo-number>-drag-drop-{before,after}.png`
+- Console logs match `SPEC.md` format
+
+**Demo-specific adaptations needed:**
+- Selectors for meal cards (varies by calendar package)
+- Selectors for day rows/drop zones (different calendar components have different structures)
+- Drag gesture parameters (some implementations may need longer durations)
+- State verification approach (how to count cards may differ)
+
+## Adding New Tests to a Demo
+
+1. **Navigate to demo's test folder**: `automation/tests/<demo-number>/`
+2. **Create test file** following naming convention: `##-description.test.js`
+3. **Import dependencies**: `webdriverio`, `chai` for assertions, `path` for file operations
+4. **Use test template structure**:
+   ```javascript
+   const wdio = require('webdriverio');
+   const assert = require('assert');
+   const path = require('path');
+   
+   describe('Demo XX - Feature Name', function() {
+       this.timeout(120000);
+       let driver;
+       
+       before(async function() {
+           // Initialize WebDriver session with demo-specific app path
+           const appPath = process.env.APP_PATH || 
+                          path.join(__dirname, `../../../demo/XX/build/app/outputs/apk/debug/app-debug.apk`);
+           
+           // WebDriver setup...
+       });
+       
+       after(async function() {
+           if (driver) await driver.deleteSession();
+       });
+       
+       it('should perform action', async function() {
+           // Test implementation
+       });
+   });
+   ```
+5. **Keep tests self-contained**: Don't import utilities from other demo test folders
+6. **Follow wait strategies**: Always use explicit waits, never static `pause()` for synchronization
+7. **Capture evidence**: Screenshot on failure, save artifacts to `automation/screenshots/`
+
+## Reference Documentation
+
+- **Specification**: `SPEC.md` - Defines application behavior, data model, and logging requirements that **all demos must implement**
+- **Validation Protocol**: `VALIDATION.md` - High-level test scenarios and acceptance criteria that **all demos must satisfy** (but implementation details vary)
+- **Appium Research**: Research artifact contains WebDriverIO patterns, W3C Actions API usage, and drag-drop implementation details
+
+## What Success Looks Like
+
+When automation is working correctly for a demo:
+1. `mise run appium` starts server showing Flutter Integration Driver loaded
+2. `DEMO=01 mise run build-demo` produces APK at `demo/01/build/app/outputs/apk/debug/app-debug.apk`
+3. `DEMO=01 mise run test` executes all tests in `automation/tests/01/` against running emulator
+4. Tests pass with green checkmarks and evidence saved to `automation/screenshots/`
+5. Console shows structured logs matching `SPEC.md` format: `[TIMESTAMP] [LEVEL] [ACTION] - {DETAILS}`
+
+## Porting Tests to Other Repositories
+
+When a demo proves successful and needs to be integrated into another repository:
+
+1. **Copy the winning demo's test folder**: `cp -r automation/tests/01/ target-repo/automation/tests/calendar/`
+2. **Copy shared infrastructure**: `automation/package.json`, `automation/appium.config.cjs`
+3. **Adapt selectors**: Update widget keys/selectors to match target repo's implementation
+4. **Update app paths**: Modify APK/app paths to point at target repo's build output
+5. **Run validation**: Execute full test suite to ensure portability
+
+The test **patterns** (wait strategies, drag gestures, assertion approaches) remain reusable; only the **selectors** and **paths** need adaptation.

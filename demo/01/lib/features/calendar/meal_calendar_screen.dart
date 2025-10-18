@@ -85,10 +85,25 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
             title: const Text('Meal Planner'),
             actions: [
               TextButton(
+                key: const Key('saveButton'),
                 onPressed: _handleSave,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 child: const Text('Save'),
               ),
-              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Reset to last saved state',
+                child: TextButton.icon(
+                  key: const Key('resetButton'),
+                  onPressed: _handleReset,
+                  icon: const Icon(Icons.restore, size: 16),
+                  label: const Text('Reset'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
             ],
           ),
           if (state.weeks.isEmpty)
@@ -109,7 +124,6 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
                   week: week,
                   onAddPressed: (day) => _openAddSheet(context, day),
                   onMealDelete: _handleMealDelete,
-                  onResetPressed: _handleReset,
                 );
               },
             ),

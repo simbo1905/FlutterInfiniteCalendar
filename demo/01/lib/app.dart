@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme/app_theme.dart';
@@ -19,6 +20,12 @@ class MealPlannerApp extends StatelessWidget {
         title: 'Meal Planner',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+          },
+        ),
         home: const MealCalendarScreen(),
       ),
     );

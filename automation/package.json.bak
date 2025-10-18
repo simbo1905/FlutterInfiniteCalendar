@@ -1,0 +1,27 @@
+{
+  "name": "infinite-calendar-appium",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Appium Flutter Integration Driver test harness for the Infinite Scrolling Meal Planner demo.",
+  "scripts": {
+    "postinstall": "npx appium driver install --source=npm appium-flutter-integration-driver || npx appium driver update flutter-integration",
+    "appium": "appium --config ./appium.config.cjs",
+    "test": "mocha --require ./tests/setup/global.js \"tests/**/*.test.js\" --timeout 600000"
+  },
+  "dependencies": {
+    "appium": "^3.1.0",
+    "appium-flutter-finder": "^0.2.0",
+    "chai": "^4.3.10",
+    "dotenv": "^16.4.5",
+    "webdriverio": "^8.36.0"
+  },
+  "devDependencies": {
+    "appium-doctor": "^1.16.2",
+    "appium-flutter-integration-driver": "^2.0.3",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-mocha": "^10.4.0",
+    "prettier": "^3.3.3"
+  }
+}

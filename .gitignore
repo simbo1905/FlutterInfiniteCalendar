@@ -1,42 +1,67 @@
 .tmp/
 GEMINI.md
 CLAUDE.md
-# Flutter related ignores
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
+
+# Node.js - monorepo wide
+**/node_modules/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/package-lock.json
+**/yarn.lock
+**/.npm/
+**/.yarn/
+
+# Flutter related ignores - monorepo wide
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/*.iml
+**/*.log
+**/*.lock
+!**/pubspec.lock # Flutter projects keep pubspec.lock
+!**/.metadata # Flutter projects keep .metadata
+
+# Android specific ignores - monorepo wide
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/app/src/debug/
+**/android/app/build/
+**/android/build/
+
+# iOS specific ignores - monorepo wide
+**/ios/.symlinks/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Runner.xcworkspace/xcuserdata/
+**/ios/Pods/
+**/ios/.generated/
+**/ios/build/
+
+# Build outputs - monorepo wide
+**/dist/
+**/out/
+**/target/
+**/.cache/
+
+# IDE and editor ignores
 .vscode/
 .idea/
-build/
-*.iml
-*.log
-*.lock # Except pubspec.lock, which is usually committed
+**/*.swp
+**/*.swo
+**/*~
 
-# Android specific ignores
-android/.gradle/
-android/local.properties
-android/key.properties
-android/app/src/debug/
-android/app/build/
-
-# iOS specific ignores
-ios/.symlinks/
-ios/Flutter/Generated.xcconfig
-ios/Runner.xcworkspace/xcuserdata/
-ios/Pods/
-ios/.generated/
+# Environment and secrets
+.env
+.env.*
+**/.env
+**/.env.*
 
 # macOS specific ignores
 .DS_Store
+**/.DS_Store
 
-# VS Code specific ignores
-.vscode/
-
-# Other common ignores
-*.swp
-*.swo
-*~
-.env
-.env.*
+# Temporary files
 .colors

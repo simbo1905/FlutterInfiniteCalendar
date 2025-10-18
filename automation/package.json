@@ -1,0 +1,25 @@
+{
+  "name": "infinite-calendar-appium",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Test harness for Infinite Calendar demo with Appium + WebdriverIO",
+  "scripts": {
+    "doctor": "appium-doctor",
+    "start-appium": "appium --config ./appium.config.cjs",
+    "test": "wdio run ./wdio.conf.js"
+  },
+  "dependencies": {
+    "appium": "^3.1.0",
+    "webdriverio": "^8.36.0",
+    "chai": "^4.3.10",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "appium-doctor": "^1.16.2",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-mocha": "^10.4.0",
+    "prettier": "^3.3.3"
+  }
+}
