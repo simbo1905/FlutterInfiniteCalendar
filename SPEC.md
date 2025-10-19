@@ -228,3 +228,41 @@ The following events must be logged:
     - **Action:** Move the meal to Tuesday again. Tap "Save".
     - **Action:** Move the meal to Wednesday. Tap "Reset".
     - **Verify:** The meal moves back to Tuesday (the last saved state), not Monday (the initial state).
+
+## 9. Planned Meals Counter
+
+### 9.1. Display Requirements
+- **Position:** Left of Save/Reset buttons, right-justified in the app bar
+- **Initial state:** Display "No Planned Meals" when the app first loads
+- **Loaded state:** Display "Planned Meals: N" where N is the count of meals on current day and all future days
+- **Widget key:** `Key('planned_meals_counter')` for testing purposes
+
+### 9.2. Update Behavior
+- Counter must increment by 1 when a meal is added to the current day or any future day
+- Counter must decrement by 1 when a meal is removed from the current day or any future day
+- Counter must update appropriately on Save/Reset operations
+- Counter must display "No Planned Meals" when the count is zero (not "Planned Meals: 0")
+- All counter updates must log to console: `print('updating planned meals to N');` where N is the new count
+- The log must appear **before** the UI updates
+
+### 9.3. Demo Data Initialization
+- The application must load exactly 12 dummy meals on startup
+- Meals must follow a fixed distribution pattern by day of week (repeating):
+  - Monday: 3 meals
+  - Tuesday: 2 meals
+  - Wednesday: 1 meal
+  - Thursday: 0 meals
+  - Friday: 3 meals
+  - Saturday: 2 meals
+  - Sunday: 1 meal
+- This pattern starts from the current week's Monday and extends through the next week
+- Total meals across both weeks: 3+2+1+0+3+2+1 = 12 meals
+- After demo data loads, the first counter update must set the counter to "Planned Meals: 12"
+- Console must log: `updating planned meals to 12` after initialization completes
+
+### 9.4. Implementation Notes
+- Initialization logic should be simple, deterministic, and hardcoded
+- No random generation for the demo data
+- The counter serves dual purposes:
+  1. User-facing feature showing upcoming meal count
+  2. Test synchronization point for automated testing

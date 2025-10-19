@@ -505,6 +505,128 @@ Tests are evaluated on a pass/fail basis. Final grade is calculated as:
 
 ---
 
-## Cross-Reference Verification
+## Planned Meals Counter Validation
 
-**Test Data Consistency**: The test scenarios above have been cross-checked with the demo implementation code. All meal names referenced in the validation tests (e.g., "Oatmeal", "Fish and Chips", "Chicken Salad", "Apple Slices", "Herbal Tea", "Scrambled Eggs") exactly match the meal templates defined in the demo code and SPEC.md. The implementation uses the standardized meal template data as specified, ensuring validation tests will execute correctly against any demo implementation.
+### Test 24: Planned Meals Counter - Initial State
+**Objective**: Verify counter displays correct initial state before data loads.
+
+**Steps**:
+1. Launch application
+2. Observe counter widget in app bar before data loads
+
+**Expected Results**:
+- Counter displays "No Planned Meals"
+- Text is visible and properly positioned left of Save/Reset buttons
+- Widget has key `planned_meals_counter`
+
+---
+
+### Test 25: Planned Meals Counter - Demo Data Load
+**Objective**: Verify counter updates to 12 after demo data initialization.
+
+**Steps**:
+1. Launch application
+2. Wait for demo data to load
+3. Observe counter update
+4. Check console logs
+
+**Expected Results**:
+- Counter updates from "No Planned Meals" to "Planned Meals: 12"
+- Console shows: `updating planned meals to 12`
+- All 12 meals follow distribution pattern: 3,2,1,0,3,2,1 (Mon-Sun repeating)
+- Pattern starts from current week's Monday
+
+---
+
+### Test 26: Planned Meals Counter - Add Operation
+**Objective**: Verify counter increments when adding meals to future days.
+
+**Steps**:
+1. From initial state with 12 meals
+2. Add a meal to a future day (e.g., next Monday)
+3. Verify counter increments
+4. Check console log
+
+**Expected Results**:
+- Counter updates to "Planned Meals: 13"
+- Console shows: `updating planned meals to 13`
+- UI updates immediately after add operation
+
+---
+
+### Test 27: Planned Meals Counter - Remove Operation
+**Objective**: Verify counter decrements when removing meals from current/future days.
+
+**Steps**:
+1. From state with 12 meals
+2. Delete a meal from current or future day
+3. Verify counter decrements
+4. Check console log
+
+**Expected Results**:
+- Counter updates to "Planned Meals: 11"
+- Console shows: `updating planned meals to 11`
+- UI updates immediately after delete operation
+
+---
+
+### Test 28: Planned Meals Counter - Past Day Exclusion
+**Objective**: Verify counter only counts current and future meals.
+
+**Steps**:
+1. Navigate to a past week
+2. Add meals to past days
+3. Observe counter value
+
+**Expected Results**:
+- Counter does not increment for past day meals
+- Only meals on current day and future days are counted
+- Console logs reflect accurate count excluding past meals
+
+---
+
+### Test 29: Planned Meals Counter - Reset to Zero
+**Objective**: Verify counter displays "No Planned Meals" when count reaches zero.
+
+**Steps**:
+1. Delete all 12 meals one by one
+2. Observe counter after each deletion
+3. Observe counter when last meal is deleted
+
+**Expected Results**:
+- Counter decrements: 12 → 11 → 10 → ... → 1 → 0
+- When count reaches 0, display changes to "No Planned Meals" (not "Planned Meals: 0")
+- Console shows: `updating planned meals to 0` after last deletion
+
+---
+
+### Test 30: Planned Meals Counter - Move Between Days
+**Objective**: Verify counter updates correctly when meals are moved between days.
+
+**Steps**:
+1. Move a meal from future day to another future day
+2. Move a meal from future day to past day
+3. Move a meal from past day to future day
+
+**Expected Results**:
+- Moving between future days: counter unchanged
+- Moving from future to past: counter decrements by 1
+- Moving from past to future: counter increments by 1
+- Each boundary cross logs the new count
+
+---
+
+### Test 31: Planned Meals Counter - Save and Reset
+**Objective**: Verify counter updates correctly on Save/Reset operations.
+
+**Steps**:
+1. From initial 12 meals, add 2 meals (counter shows 14)
+2. Tap "Save"
+3. Add 1 more meal (counter shows 15)
+4. Tap "Reset"
+5. Observe counter
+
+**Expected Results**:
+- After Reset, counter returns to 14 (saved state)
+- Console logs the count update on reset
+- Counter reflects the restored state accurately

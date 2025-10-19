@@ -84,6 +84,25 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             title: const Text('Meal Planner'),
             actions: [
+              Consumer(
+                builder: (context, ref, _) {
+                  final count = ref.watch(plannedMealsCountProvider);
+                  final text = count == 0 
+                    ? 'No Planned Meals' 
+                    : 'Planned Meals: $count';
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        text,
+                        key: const Key('planned_meals_counter'),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  );
+                },
+              ),
               TextButton(
                 key: const Key('saveButton'),
                 onPressed: _handleSave,

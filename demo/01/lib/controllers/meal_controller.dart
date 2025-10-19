@@ -20,6 +20,13 @@ final baseDateProvider = Provider<DateTime>((ref) {
 final mealControllerProvider =
     NotifierProvider<MealController, CalendarState>(MealController.new);
 
+final plannedMealsCountProvider = Provider<int>((ref) {
+  final state = ref.watch(mealControllerProvider);
+  final baseDate = ref.read(baseDateProvider);
+  final today = DateTime(baseDate.year, baseDate.month, baseDate.day);
+  return ref.read(mealRepositoryProvider).countFutureMeals(today);
+});
+
 class MealController extends Notifier<CalendarState> {
   late final DateTime _baseDate;
 
@@ -132,11 +139,13 @@ class MealController extends Notifier<CalendarState> {
     });
     
     if (week == null) {
+      _logPlannedMealsCount();
       return meal;
     }
 
     final dayIndex = week.days.indexWhere((d) => _isSameDay(d.date, day));
     if (dayIndex == -1) {
+      _logPlannedMealsCount();
       return meal;
     }
 
@@ -146,6 +155,7 @@ class MealController extends Notifier<CalendarState> {
     );
     final updatedWeek = _replaceDay(week, updatedDay);
     state = state.insertWeek(updatedWeek);
+    _logPlannedMealsCount();
     return meal;
   }
 
@@ -173,6 +183,14 @@ class MealController extends Notifier<CalendarState> {
     }
 
     final oldOrder = meal.order;
+    
+    final today = DateTime(_baseDate.year, _baseDate.month, _baseDate.day);
+    final fromNormalized = DateTime(fromDay.year, fromDay.month, fromDay.day);
+    final toNormalized = DateTime(toDay.year, toDay.month, toDay.day);
+    
+    final fromIsFuture = fromNormalized.isAtSameMomentAs(today) || fromNormalized.isAfter(today);
+    final toIsFuture = toNormalized.isAtSameMomentAs(today) || toNormalized.isAfter(today);
+    final crossesBoundary = fromIsFuture != toIsFuture;
     
     _repository.moveMeal(
       fromDay: fromDay,
@@ -221,6 +239,10 @@ class MealController extends Notifier<CalendarState> {
       final newToWeek = _replaceDay(refreshedToWeek, updatedToDay);
       state = state.insertWeek(newToWeek);
     }
+    
+    if (crossesBoundary) {
+      _logPlannedMealsCount();
+    }
   }
 
   void removeMeal({required DateTime day, required MealInstance meal}) {
@@ -244,6 +266,7 @@ class MealController extends Notifier<CalendarState> {
       meals: _repository.mealsForDay(day),
     );
     state = state.insertWeek(_replaceDay(week, updatedDay));
+    _logPlannedMealsCount();
   }
 
   List<MealTemplate> templates() => _repository.templates;
@@ -261,6 +284,7 @@ class MealController extends Notifier<CalendarState> {
     _repository.restoreSnapshot();
     final restored = _cloneWeekMap(state.savedWeekMap);
     state = state.copyWith(weekMap: restored);
+    _logPlannedMealsCount();
   }
 
   void setSelectedDay(DateTime day) {
@@ -305,6 +329,12 @@ class MealController extends Notifier<CalendarState> {
 
   static String _dateKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  void _logPlannedMealsCount() {
+    final today = DateTime(_baseDate.year, _baseDate.month, _baseDate.day);
+    final count = _repository.countFutureMeals(today);
+    print('updating planned meals to $count');
   }
 }
 

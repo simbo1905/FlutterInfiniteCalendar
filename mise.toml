@@ -7,7 +7,7 @@ run = "npm install --prefix automation"
 
 [tasks.appium]
 description = "Start Appium server"
-run = "npm exec --prefix automation appium -- --config ./automation/appium.config.cjs"
+run = "export ANDROID_HOME=\"$HOME/Library/Android/sdk\" && npm exec --prefix automation appium -- --config ./automation/appium.config.cjs"
 
 [tasks.test]
 description = "Run Appium tests (specify DEMO=01 or DEMO=02)"
@@ -16,9 +16,10 @@ if [ -z "$DEMO" ]; then
   echo "❌ Error: Must specify DEMO env var (e.g., DEMO=01 mise run test)"
   exit 1
 fi
+export ANDROID_HOME="$HOME/Library/Android/sdk"
 npm test --prefix automation
 """
-env = { APP_PATH = "demo/$DEMO/build/app/outputs/apk/debug/app-debug.apk" }
+env = { APP_PATH = "demo/$DEMO/build/app/outputs/flutter-apk/app-debug.apk" }
 
 [tasks.build-demo]
 description = "Build integration test APK for a demo (DEMO=01 or DEMO=02)"
@@ -31,8 +32,9 @@ cd demo/$DEMO
 flutter pub get
 mkdir -p integration_test
 if [ ! -f integration_test/appium_test.dart ]; then
-  echo "⚠️  Warning: integration_test/appium_test.dart missing in demo/$DEMO"
+  echo "❌ Error: integration_test/appium_test.dart missing in demo/$DEMO"
+  exit 1
 fi
-cd android
-./gradlew app:assembleDebug -Ptarget=../integration_test/appium_test.dart
+flutter build apk --debug --target=integration_test/appium_test.dart
+echo "✅ APK built at demo/$DEMO/build/app/outputs/flutter-apk/app-debug.apk"
 """

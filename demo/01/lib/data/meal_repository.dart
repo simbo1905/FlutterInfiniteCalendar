@@ -159,6 +159,27 @@ class MealRepository {
     });
   }
 
+  int countFutureMeals(DateTime referenceDate) {
+    final today = DateTime(referenceDate.year, referenceDate.month, referenceDate.day);
+    int count = 0;
+    _workingState.forEach((dateKey, meals) {
+      final mealDate = _parseDateKey(dateKey);
+      if (mealDate.isAtSameMomentAs(today) || mealDate.isAfter(today)) {
+        count += meals.length;
+      }
+    });
+    return count;
+  }
+
+  DateTime _parseDateKey(String dateKey) {
+    final parts = dateKey.split('-');
+    return DateTime(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
+  }
+
   List<MealInstance> _reorderMeals(List<MealInstance> meals) {
     final reordered = <MealInstance>[];
     for (int i = 0; i < meals.length; i++) {
