@@ -25,12 +25,38 @@ void main() {
       // Step 1: Wait for calendar to fully render with cards
       print('📅 [STEP_A1] Waiting for calendar to fully render with cards...');
       
-      // Find all available meal cards
-      final allCards = find.byType(Card);
-      final cardCount = allCards.evaluate().length;
-      print('🍽️ [INFO] Found $cardCount total cards on screen');
+      // Wait for meal data to load dynamically (same approach as Test 1)
+      print('🍽️ [STEP_A1] Waiting for meal data to load dynamically...');
       
-      expect(cardCount, greaterThan(0), reason: 'Need at least one meal card for testing');
+      bool mealCardsFound = false;
+      for (int i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 500));
+        
+        // Look for meal cards by searching for typical meal names
+        final potentialCards = [
+          find.text('Oatmeal'),
+          find.text('Scrambled Eggs'),
+          find.text('Chicken Salad'),
+          find.text('Fish and Chips'),
+          find.byType(Card),
+        ];
+        
+        bool anyFound = false;
+        for (final finder in potentialCards) {
+          if (finder.evaluate().isNotEmpty) {
+            anyFound = true;
+            break;
+          }
+        }
+        
+        if (anyFound) {
+          mealCardsFound = true;
+          print('✅ [VERIFY] Meal data loaded successfully (attempt ${i + 1})');
+          break;
+        }
+      }
+      
+      expect(mealCardsFound, isTrue, reason: 'Need at least one meal card for testing');
       
       // Step 2: Identify a meal card on one day
       print('🎯 [STEP_A2] Identifying source meal card...');
@@ -40,11 +66,11 @@ void main() {
       
       // Try to find a draggable meal card by looking for common patterns
       final potentialCards = [
-        find.text('Oatmeal'),
-        find.text('Scrambled Eggs'),
-        find.text('Chicken Salad'),
-        find.text('Fish and Chips'),
-        allCards.first,
+        find.text('Oatmeal').first,
+        find.text('Scrambled Eggs').first,
+        find.text('Chicken Salad').first,
+        find.text('Fish and Chips').first,
+        find.byType(Card).first,
       ];
       
       for (final cardFinder in potentialCards) {
