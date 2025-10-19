@@ -7,21 +7,16 @@ You're absolutely right! Let me revise the AGENTS.md to reflect that tests are *
 This is a **monorepo** containing multiple Flutter demo attempts under `./demo/01/`, `./demo/02/`, etc. Each demo explores different calendar library implementations to find the best solution for the Infinite Scrolling Meal Planner specification.
 
 The automation testing infrastructure lives at the **repository root** in:
-- `./automation/` - Appium test framework (JavaScript/Node.js) - shared infrastructure
-- `./automation/tests/01/` - Tests specific to demo 01
-- `./automation/tests/02/` - Tests specific to demo 02
 - `./mise.toml` - Dependency management and task orchestration
 
 **Key principle:** The automation **framework** is reusable infrastructure. The **tests themselves are demo-specific** because each demo may use different Flutter calendar components with different widget structures, keys, and behaviors.
 
-When a winning demo is identified, its test folder (e.g., `./automation/tests/01/`) will be copied to other repositories and adapted for their specific implementations.
 
 ## Target Platform
 
 We are **testing exclusively on Android** via Android Studio emulator. This is the baseline platform verification strategy:
 
 - ✅ **Necessary but not sufficient**: If it works on Android, the pure Flutter logic should port to iOS and Web with minimal adaptation
-- ✅ **Most native testing experience**: Android emulator + Appium provides the most stable automation environment
 - ✅ **Feature validation focus**: Proves drag-and-drop, state management, and card manipulation logic works
 
 ## Verification: New Checkout Setup
@@ -37,11 +32,8 @@ cd /path/to/FlutterInfiniteCalendar
 # Install mise-managed tooling (Node.js)
 mise install
 
-# Bootstrap Appium automation workspace
 mise run bootstrap
 
-# Verify Appium server can start
-mise run appium
 # Should show: "Available drivers: flutter-integration@2.0.3"
 # Press Ctrl+C to stop
 ```
@@ -50,7 +42,6 @@ mise run appium
 
 ```bash
 # Check driver installation
-npx appium driver list
 
 # Should show:
 # ✔ flutter-integration@2.0.3 [installed (npm)]
@@ -92,14 +83,97 @@ flutter run
 
 If all four steps succeed, the environment is ready for automation testing.
 
+## Critical: Build Mode Requirements
+
+### ❌ NEVER Use These (Known Issues)
+
+- ❌ **NEVER use flutter_driver** package - deprecated and obsolete (replaced by integration_test)
+- ❌ **NEVER use enableFlutterDriverExtension()** - part of deprecated flutter_driver API
+
+### ✅ ALWAYS Use These (Modern Setup)
+
+
+### Flutter Build Modes Comparison
+
+|------|------------|-----------|-------------------|-------|
+| **Debug** | Slow, janky by design | Full DevTools, hot reload | ❌ **Causes freezing** | UI rendering blocked by debugging protocol |
+| **Profile** | Near-release speed | Minimal VM service | ✅ **Works perfectly** | Removes debug overhead, keeps integration server |
+| **Release** | Maximum speed | All debugging stripped | ❌ **Cannot connect** | Integration test server removed |
+
+### Platform-Specific Limitations
+
+**iOS:**
+- ⚠️ **Profile mode does NOT work on iOS Simulator** - requires physical device
+- Debug and release modes work on simulator, but debug causes same freezing issues
+- Command: `flutter build ios --profile` (then deploy to connected device)
+
+**Web:**
+- Web testing requires different tools (e.g., Selenium WebDriver, Playwright)
+- `flutter run -d chrome` causes freezing due to debugging overhead
+- For manual web testing: use `flutter run -d web-server --web-port 8080` then open in any browser
+- For automated web testing: build with `flutter build web --release` and use standard web automation tools
+
+**Android:**
+- ✅ **Works on both emulators and physical devices** with profile builds
+- Emulators are recommended for CI/CD automation
+- Physical devices recommended for performance validation
+
+### Environment Configuration
+
+**ANDROID_HOME:**
+- Required for Android SDK access
+- Default macOS location: `$HOME/Library/Android/sdk`
+- Default Linux location: `$HOME/Android/Sdk`
+- Windows: `%LOCALAPPDATA%\Android\Sdk`
+- If using custom SDK location, set environment variable before running tests:
+  ```bash
+  export ANDROID_HOME="/path/to/your/android/sdk"
+  DEMO=01 mise run test
+  ```
+
+**Flutter SDK:**
+- Must be in PATH and accessible
+- Verify with: `flutter doctor -v`
+- Ensure Android toolchain is properly configured
+
+### Why Debug Mode Freezes
+
+**The Problem:**
+- Flutter's Dart VM runs on a single-threaded isolate
+- In debug mode: UI rendering + VM Service Protocol share the same thread
+- Debugging operations (DevTools, breakpoints, VM messages) block the event loop
+- When event loop is blocked, frames cannot paint
+- Chrome DevTools connection adds massive overhead (DWDS, DDS, WebSocket connections)
+- **Result:** App freezes, cards don't render, 60+ second delays
+
+**The Solution:**
+- Profile mode removes Chrome DevTools overhead
+- Profile mode removes hot reload compilation overhead
+- Profile mode removes debugging symbol overhead
+- Profile mode runs at near-release performance
+- UI rendering runs freely without blocking
+
+### Modern Flutter Integration Testing Stack (2025)
+
+**Correct Setup:**
+- ✅ Build mode: `flutter build apk --profile`
+
+```dart
+import 'package:meal_planner_demo/app.dart';
+
+Future<void> main() async {
+  await initializeTest(
+    app: const MealPlannerApp(),
+  );
+}
+```
+
 ## Test Architecture
 
-Tests are written in **JavaScript using WebDriverIO** and reside in **demo-specific folders** under `automation/tests/`. Each demo gets its own isolated test directory:
 
 ```
 automation/
 ├── package.json           # Shared dependencies
-├── appium.config.cjs      # Shared Appium config
 ├── screenshots/           # Test evidence output
 └── tests/
     ├── 01/                # Tests for demo/01/
@@ -119,38 +193,40 @@ automation/
 
 ### Test Execution Workflow
 
-1. **Terminal 1**: Start Appium server
    ```bash
    cd /path/to/FlutterInfiniteCalendar
-   mise run appium
    # Leave running
    ```
 
-2. **Terminal 2**: Build test-enabled APK for target demo
+2. **Terminal 2**: Build PROFILE APK for target demo
    ```bash
    cd /path/to/FlutterInfiniteCalendar
    DEMO=01 mise run build-demo
+   # Produces: demo/01/build/app/outputs/flutter-apk/app-profile.apk
    ```
 
-3. **Terminal 3**: Run tests for specific demo
+3. **Terminal 3**: Uninstall old debug version (if exists)
+   ```bash
+   adb uninstall com.example.meal_planner_demo
+   ```
+
+4. **Terminal 3**: Run tests for specific demo
    ```bash
    cd /path/to/FlutterInfiniteCalendar
    DEMO=01 mise run test
-   # This runs all tests in automation/tests/01/
    ```
+
+**Important:** Always use profile builds (app-profile.apk), never debug builds (app-debug.apk). Debug mode causes UI freezing and makes testing impossible.
 
 ## Test Implementation Guide
 
-When creating tests for a new demo, create a new numbered directory under `automation/tests/` and implement the following baseline tests. Each demo must satisfy the same **behavioral requirements** from `SPEC.md`, but the **test implementation** will differ based on the actual widgets and keys used.
 
 ### Test 1: Hello World - Card Count Verification
 
-**File:** `automation/tests/<demo-number>/01-hello-world.test.js`
 
 **Purpose:** Baseline smoke test that verifies the Flutter app launches successfully and the calendar screen renders with dynamically loaded meal cards.
 
 **Behavior:**
-1. Connect to the Flutter app via Appium
 2. **Wait for dynamic content to load** - The calendar screen fetches and renders mock meal data asynchronously after the app initializes
 3. Count the total number of meal cards visible on screen
 4. Assert that at least one card is present (per `SPEC.md` initial data requirements)
@@ -172,7 +248,6 @@ When creating tests for a new demo, create a new numbered directory under `autom
 
 ### Test 2: Drag and Drop - Card Movement Verification
 
-**File:** `automation/tests/<demo-number>/02-drag-drop.test.js`
 
 **Purpose:** Validates the core drag-and-drop functionality by moving a meal card from a populated day to an empty day.
 
@@ -212,7 +287,6 @@ When creating tests for a new demo, create a new numbered directory under `autom
 
 ## Adding New Tests to a Demo
 
-1. **Navigate to demo's test folder**: `automation/tests/<demo-number>/`
 2. **Create test file** following naming convention: `##-description.test.js`
 3. **Import dependencies**: `webdriverio`, `chai` for assertions, `path` for file operations
 4. **Use test template structure**:
@@ -228,7 +302,7 @@ When creating tests for a new demo, create a new numbered directory under `autom
        before(async function() {
            // Initialize WebDriver session with demo-specific app path
            const appPath = process.env.APP_PATH || 
-                          path.join(__dirname, `../../../demo/XX/build/app/outputs/apk/debug/app-debug.apk`);
+                          path.join(__dirname, `../../../demo/XX/build/app/outputs/flutter-apk/app-profile.apk`);
            
            // WebDriver setup...
        });
@@ -250,14 +324,11 @@ When creating tests for a new demo, create a new numbered directory under `autom
 
 - **Specification**: `SPEC.md` - Defines application behavior, data model, and logging requirements that **all demos must implement**
 - **Validation Protocol**: `VALIDATION.md` - High-level test scenarios and acceptance criteria that **all demos must satisfy** (but implementation details vary)
-- **Appium Research**: Research artifact contains WebDriverIO patterns, W3C Actions API usage, and drag-drop implementation details
 
 ## What Success Looks Like
 
 When automation is working correctly for a demo:
-1. `mise run appium` starts server showing Flutter Integration Driver loaded
-2. `DEMO=01 mise run build-demo` produces APK at `demo/01/build/app/outputs/apk/debug/app-debug.apk`
-3. `DEMO=01 mise run test` executes all tests in `automation/tests/01/` against running emulator
+2. `DEMO=01 mise run build-demo` produces APK at `demo/01/build/app/outputs/flutter-apk/app-profile.apk`
 4. Tests pass with green checkmarks and evidence saved to `automation/screenshots/`
 5. Console shows structured logs matching `SPEC.md` format: `[TIMESTAMP] [LEVEL] [ACTION] - {DETAILS}`
 
@@ -265,8 +336,6 @@ When automation is working correctly for a demo:
 
 When a demo proves successful and needs to be integrated into another repository:
 
-1. **Copy the winning demo's test folder**: `cp -r automation/tests/01/ target-repo/automation/tests/calendar/`
-2. **Copy shared infrastructure**: `automation/package.json`, `automation/appium.config.cjs`
 3. **Adapt selectors**: Update widget keys/selectors to match target repo's implementation
 4. **Update app paths**: Modify APK/app paths to point at target repo's build output
 5. **Run validation**: Execute full test suite to ensure portability

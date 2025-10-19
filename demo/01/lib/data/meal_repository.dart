@@ -8,15 +8,11 @@ class MealRepository {
   MealRepository({
     Random? random,
     Map<String, List<MealInstance>>? initialState,
-  })  : _random = random ?? Random(),
-        _initialState = initialState == null
-            ? null
-            : initialState.map(
-                (key, value) => MapEntry(
-                  key,
-                  value.map((meal) => meal.copyWith()).toList(),
-                ),
-              );
+  }) : _random = random ?? Random(),
+       _initialState = initialState?.map(
+         (key, value) =>
+             MapEntry(key, value.map((meal) => meal.copyWith()).toList()),
+       );
 
   final Random _random;
   final Map<String, List<MealInstance>>? _initialState;
@@ -29,8 +25,8 @@ class MealRepository {
     _workingState.clear();
     _persistentState.clear();
 
-    if (_initialState != null && _initialState!.isNotEmpty) {
-      _initialState!.forEach((key, meals) {
+    if (_initialState != null && _initialState.isNotEmpty) {
+      _initialState.forEach((key, meals) {
         _persistentState[key] = meals.map((m) => m.copyWith()).toList();
         _workingState[key] = meals.map((m) => m.copyWith()).toList();
       });
@@ -39,50 +35,59 @@ class MealRepository {
     }
 
     final currentWeekStart = _startOfWeek(today);
-    
+
     for (int weekOffset = 0; weekOffset <= 1; weekOffset++) {
       for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
-        final date = currentWeekStart.add(Duration(days: weekOffset * 7 + dayOffset));
+        final date = currentWeekStart.add(
+          Duration(days: weekOffset * 7 + dayOffset),
+        );
         final dateKey = _dateKey(date);
-        
+
         final mealCount = _random.nextInt(4);
         final meals = <MealInstance>[];
-        
+
         for (int i = 0; i < mealCount; i++) {
           final template = mealTemplates[_random.nextInt(mealTemplates.length)];
-          meals.add(MealInstance(
-            id: UuidGenerator.generate(),
-            templateId: template.templateId,
-            date: date,
-            order: i,
-            title: template.title,
-            quantity: template.quantity,
-            color: template.color,
-            icon: template.icon,
-          ));
+          meals.add(
+            MealInstance(
+              id: UuidGenerator.generate(),
+              templateId: template.templateId,
+              date: date,
+              order: i,
+              title: template.title,
+              quantity: template.quantity,
+              color: template.color,
+              icon: template.icon,
+            ),
+          );
         }
-        
+
         _persistentState[dateKey] = meals;
         _workingState[dateKey] = meals.map((m) => m.copyWith()).toList();
       }
     }
-    
+
     AppLogger.initState(_serializePersistentState());
   }
 
   Map<String, dynamic> _serializePersistentState() {
     final serialized = <String, dynamic>{};
     _persistentState.forEach((date, meals) {
-      serialized[date] = meals.map((meal) => {
-        'id': meal.id,
-        'templateId': meal.templateId,
-        'date': _dateKey(meal.date),
-        'order': meal.order,
-        'title': meal.title,
-        'quantity': meal.quantity,
-        'color': '#${meal.color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
-        'icon': meal.icon.codePoint,
-      }).toList();
+      serialized[date] = meals
+          .map(
+            (meal) => {
+              'id': meal.id,
+              'templateId': meal.templateId,
+              'date': _dateKey(meal.date),
+              'order': meal.order,
+              'title': meal.title,
+              'quantity': meal.quantity,
+              'color':
+                  '#${meal.color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
+              'icon': meal.icon.codePoint,
+            },
+          )
+          .toList();
     });
     return serialized;
   }
@@ -120,21 +125,21 @@ class MealRepository {
   }) {
     final fromKey = _dateKey(fromDay);
     final toKey = _dateKey(toDay);
-    
+
     final fromMeals = _workingState[fromKey] ?? [];
     fromMeals.removeWhere((m) => m.id == meal.id);
     _workingState[fromKey] = _reorderMeals(fromMeals);
-    
+
     final toMeals = _workingState[toKey] ?? [];
     final updatedMeal = meal.copyWith(date: toDay);
-    
+
     final safeIndex = insertIndex?.clamp(0, toMeals.length);
     if (safeIndex != null) {
       toMeals.insert(safeIndex, updatedMeal);
     } else {
       toMeals.add(updatedMeal);
     }
-    
+
     _workingState[toKey] = _reorderMeals(toMeals);
   }
 
@@ -160,7 +165,11 @@ class MealRepository {
   }
 
   int countFutureMeals(DateTime referenceDate) {
-    final today = DateTime(referenceDate.year, referenceDate.month, referenceDate.day);
+    final today = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    );
     int count = 0;
     _workingState.forEach((dateKey, meals) {
       final mealDate = _parseDateKey(dateKey);

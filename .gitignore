@@ -65,3 +65,6 @@ CLAUDE.md
 
 # Temporary files
 .colors
+repomix-output.md
+demo/01/flutter_*.png
+demo/01/.claude/

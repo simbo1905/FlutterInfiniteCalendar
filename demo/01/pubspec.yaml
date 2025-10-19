@@ -20,7 +20,6 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
-  appium_flutter_server: ^0.0.33
   flutter_lints: ^5.0.0
 
 flutter:
