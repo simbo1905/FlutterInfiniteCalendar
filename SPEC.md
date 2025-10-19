@@ -64,11 +64,18 @@ A panel that slides up from the bottom when the `+ Add` card is tapped.
     3. Drops a `Meal Card` onto a day row.
 - **Visuals:** The selected day row must be visually distinct from other rows.
 
-### 3.3. Drag-and-Drop
-- **Intra-day (Horizontal):** Users can press and hold a `Meal Card` and drag it left or right within the same day's carousel to reorder it.
-- **Inter-day (Vertical):** Users can press and hold a `Meal Card` and drag it up or down to a different day.
-    - As the card is dragged to the top or bottom edge of the viewport, the calendar should auto-scroll vertically to reveal previous or subsequent weeks.
-    - Dropping the card on a new day moves the meal to that day.
+### 3.3. Moving Meals Between Days
+- **Long-Press Gesture:** Users can press and hold a `Meal Card` to open an action menu.
+- **Action Menu:** A bottom sheet appears with two options:
+  - **Move to Another Day** - Opens a date picker
+  - **Delete Meal** - Opens delete confirmation dialog
+- **Date Picker Flow:**
+  1. User taps "Move to Another Day"
+  2. A date picker (CupertinoDatePicker) appears in a bottom sheet
+  3. User scrolls to select the target date
+  4. User taps "Done" to confirm the move
+  5. The meal card is removed from the original day and added to the selected day
+- **Visual Hint:** Each meal card displays a semi-transparent lightning bolt icon to indicate long-press is available.
 
 ### 3.4. Adding a Meal
 1. User taps the `+ Add` card on a specific day (this day becomes the "selected day").
@@ -78,9 +85,10 @@ A panel that slides up from the bottom when the `+ Add` card is tapped.
 5. A new `Meal Card`, based on the chosen template, appears in the selected day's carousel.
 
 ### 3.5. Deleting a Meal
-1. User taps the `[x]` button on a `Meal Card`.
-2. A confirmation dialog appears with "Cancel" and "Delete" options.
-3. If "Delete" is chosen, the card is removed from the UI.
+1. User long-presses a `Meal Card` to open the action menu.
+2. User taps "Delete Meal" in the action menu.
+3. A confirmation dialog appears with "Cancel" and "Delete" options.
+4. If "Delete" is chosen, the card is removed from the UI.
 
 ### 3.6. State Management (Save/Reset)
 - The application maintains two states for the meal plan: a `workingState` and a `persistentState`.

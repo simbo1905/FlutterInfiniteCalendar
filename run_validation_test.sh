@@ -1,0 +1,163 @@
+#!/usr/bin/env sh
+# Validation Test Runner - POSIX compliant version
+# Runs Flutter integration tests for VALIDATION_*.md files
+# Usage: ./run_validation_test.sh [DEMO_NUMBER] [TEST_NUMBER]
+#   DEMO_NUMBER: 01, 02, etc. (default: 01)
+#   TEST_NUMBER: 01, 02, etc. (default: 01)
+
+set -e
+
+# Parse arguments
+DEMO="${1:-01}"
+TEST_NUM="${2:-01}"
+
+# Validate demo directory exists
+DEMO_DIR="./demo/$DEMO"
+if [ ! -d "$DEMO_DIR" ]; then
+    echo "ERROR: Demo directory not found: $DEMO_DIR"
+    echo "Usage: $0 [DEMO_NUMBER] [TEST_NUMBER]"
+    exit 1
+fi
+
+# Change to demo directory
+cd "$DEMO_DIR"
+
+# Configuration
+TEST_FILE="integration_test/validation_${DEMO}_${TEST_NUM}.dart"
+LOG_DIR=".tmp"
+
+# Check if test file exists
+if [ ! -f "$TEST_FILE" ]; then
+    echo "ERROR: Test file not found: $TEST_FILE"
+    echo "Available tests:"
+    ls integration_test/validation_*.dart 2>/dev/null || echo "  (none found)"
+    exit 1
+fi
+
+ACTUAL_TEST_FILE="$TEST_FILE"
+
+# Generate datetime-based log filename: ios_YYYYMMDD_HHMM_XX.log
+DATE_TIME=$(date '+%Y%m%d_%H%M')
+LOG_FILE="$LOG_DIR/ios_${DATE_TIME}_${TEST_NUM}.log"
+
+SIMULATOR_WAIT=60
+TEST_TIMEOUT=120
+
+# Create log directory
+mkdir -p "$LOG_DIR"
+
+# Function to check if simulator is running
+is_simulator_running() {
+    xcrun simctl list devices booted | grep -q "iPhone" && echo "yes" || echo "no"
+}
+
+# Function to get current time
+current_time() {
+    date '+%H:%M:%S'
+}
+
+echo "=========================================="
+echo "Validation Test Runner"
+echo "Demo: $DEMO"
+echo "Test: $TEST_NUM"
+echo "File: $ACTUAL_TEST_FILE"
+echo "=========================================="
+echo ""
+
+# Step 1: Check simulator status
+echo "[$(current_time)] Checking iOS Simulator status..."
+if [ "$(is_simulator_running)" = "no" ]; then
+    echo "[$(current_time)] Simulator is NOT running. Starting it..."
+    
+    # Start simulator in background
+    timeout 30 flutter emulators --launch apple_ios_simulator > "$LOG_DIR/simulator_launch.log" 2>&1 || true
+    
+    echo "[$(current_time)] Waiting ${SIMULATOR_WAIT}s for simulator to boot..."
+    sleep "$SIMULATOR_WAIT"
+else
+    echo "[$(current_time)] Simulator is already running"
+fi
+
+# Step 2: Verify simulator is actually ready
+echo "[$(current_time)] Verifying devices are available..."
+timeout 10 flutter devices > "$LOG_DIR/devices.log" 2>&1
+
+if ! grep -q "iPhone" "$LOG_DIR/devices.log"; then
+    echo "[$(current_time)] ERROR: No iPhone simulator found after startup"
+    echo "Available devices:"
+    cat "$LOG_DIR/devices.log"
+    exit 1
+fi
+
+# Step 3: Get exact device ID
+# Extract the UUID from the iPhone line (second field after the bullet)
+DEVICE_ID=$(flutter devices | grep "iPhone" | head -1 | awk -F'•' '{print $2}' | xargs)
+echo "[$(current_time)] Found device: $DEVICE_ID"
+
+# Step 4: Run the test with timeout
+echo "[$(current_time)] Starting test with ${TEST_TIMEOUT}s timeout..."
+echo "[$(current_time)] Test output is being written to: $LOG_FILE"
+echo "[$(current_time)] To follow along: tail -f $LOG_FILE"
+echo ""
+
+# Run test in background with timeout
+(
+    timeout "$TEST_TIMEOUT" flutter test "$ACTUAL_TEST_FILE" -d "$DEVICE_ID" > "$LOG_FILE" 2>&1
+    echo "EXIT_CODE=$?" >> "$LOG_FILE"
+) &
+
+TEST_PID=$!
+
+# Optional: Start tailing the log in background (user can run tail -f manually)
+echo "[$(current_time)] Tip: In another terminal, run: tail -f $DEMO_DIR/$LOG_FILE"
+
+# Step 5: Monitor the test (show progress dots)
+printf "Running test"
+COUNT=0
+while kill -0 $TEST_PID 2>/dev/null; do
+    printf "."
+    sleep 2
+    COUNT=$((COUNT + 2))
+    
+    # Show a status update every 10 seconds
+    if [ $((COUNT % 10)) -eq 0 ]; then
+        printf " [%ds]" "$COUNT"
+    fi
+    
+    # Safety check - if we've been waiting too long
+    if [ "$COUNT" -gt "$TEST_TIMEOUT" ]; then
+        echo ""
+        echo "[$(current_time)] WARNING: Test exceeded timeout, killing..."
+        kill -9 $TEST_PID 2>/dev/null || true
+        break
+    fi
+done
+echo ""
+
+# Step 6: Check results
+echo ""
+echo "[$(current_time)] Test completed. Checking results..."
+echo ""
+
+# Extract last 50 lines of log for summary
+echo "=== TEST OUTPUT (last 50 lines) ==="
+tail -50 "$LOG_FILE" 2>/dev/null || echo "No output captured"
+echo ""
+
+# Check if test passed
+if grep -q "All tests passed!" "$LOG_FILE" 2>/dev/null; then
+    echo "✅ TEST PASSED!"
+    exit 0
+elif grep -q "+0 -[1-9]" "$LOG_FILE" 2>/dev/null; then
+    echo "❌ TEST FAILED - Some tests did not pass"
+    echo "Full log: $DEMO_DIR/$LOG_FILE"
+    exit 1
+elif grep -q "error:" "$LOG_FILE" 2>/dev/null; then
+    echo "❌ BUILD/RUNTIME ERROR"
+    echo "Full log: $DEMO_DIR/$LOG_FILE"
+    exit 1
+else
+    echo "⚠️ TEST STATUS UNKNOWN"
+    echo "Check full log: $DEMO_DIR/$LOG_FILE"
+    exit 2
+fi

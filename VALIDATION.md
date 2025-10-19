@@ -4,7 +4,33 @@
 
 This document defines the validation requirements for any implementation of the Infinite Scrolling Meal Planner as specified in `SPEC.md`. 
 
-**Prerequisites**: Read `AGENTS.md` first to understand the project structure, monorepo layout, and automation architecture.
+**Prerequisites**: Read `AGENTS.md` first to understand the project structure, monorepo layout, and testing architecture.
+
+## Running Validation Tests
+
+From repository root:
+
+```bash
+# Run validation test 01 for demo 01
+./run_validation_test.sh 01 01
+
+# Run validation test 02 for demo 01  
+./run_validation_test.sh 01 02
+
+# Run validation test 01 for demo 02
+./run_validation_test.sh 02 01
+
+# Defaults to demo 01, test 01 if no arguments
+./run_validation_test.sh
+```
+
+**What the script does**:
+- Automatically starts iOS Simulator if not running
+- Runs integration test from `demo/XX/integration_test/validation_YY_*_test.dart`
+- Logs output to `demo/XX/.tmp/ios_YYYYMMDD_HHMM_YY.log`
+- Shows pass/fail status with clear indicators
+
+See `AGENTS.md` for complete testing infrastructure details and architecture.
 
 ## Testing Approach
 

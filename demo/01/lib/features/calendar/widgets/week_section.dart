@@ -8,12 +8,12 @@ class WeekSection extends ConsumerWidget {
     super.key,
     required this.week,
     required this.onAddPressed,
-    required this.onMealDelete,
+    required this.onMealLongPress,
   });
 
   final CalendarWeek week;
   final Function(DateTime) onAddPressed;
-  final Function(DateTime, MealInstance) onMealDelete;
+  final Function(MealInstance, DateTime) onMealLongPress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,7 +47,7 @@ class WeekSection extends ConsumerWidget {
         ...week.days.map((day) => DayRow(
           day: day,
           onAddPressed: () => onAddPressed(day.date),
-          onMealDelete: (meal) => onMealDelete(day.date, meal),
+          onMealLongPress: onMealLongPress,
         )),
         const Divider(height: 1),
       ],

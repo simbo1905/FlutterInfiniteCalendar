@@ -7,6 +7,8 @@ import '../../util/app_logger.dart';
 import 'widgets/week_section.dart';
 import 'widgets/add_meal_sheet.dart';
 import 'widgets/delete_confirmation_dialog.dart';
+import 'widgets/meal_card_actions_sheet.dart';
+import 'widgets/move_meal_date_picker.dart';
 
 class MealCalendarScreen extends ConsumerStatefulWidget {
   const MealCalendarScreen({super.key});
@@ -142,7 +144,7 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
                   key: key,
                   week: week,
                   onAddPressed: (day) => _openAddSheet(context, day),
-                  onMealDelete: _handleMealDelete,
+                  onMealLongPress: _handleMealLongPress,
                 );
               },
             ),
@@ -211,7 +213,50 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
     );
   }
 
+  Future<void> _handleMealLongPress(MealInstance meal, DateTime day) async {
+    debugPrint('[ACTION] Long-press detected on meal: ${meal.title} on $day');
+    await MealCardActionsSheet.show(
+      context: context,
+      mealTitle: meal.title,
+      onMove: () => _handleMealMove(meal, day),
+      onDelete: () => _handleMealDelete(day, meal),
+    );
+  }
+
+  Future<void> _handleMealMove(MealInstance meal, DateTime fromDay) async {
+    debugPrint('[ACTION] Move action selected for meal: ${meal.title}');
+    await MoveMealDatePicker.show(
+      context: context,
+      initialDate: fromDay,
+      onDateSelected: (newDate) {
+        if (!mounted) return;
+        
+        debugPrint('[ACTION] Date selected: $newDate (from: $fromDay)');
+        
+        // Only move if date actually changed
+        if (newDate.year != fromDay.year ||
+            newDate.month != fromDay.month ||
+            newDate.day != fromDay.day) {
+          debugPrint('[ACTION] Moving meal ${meal.title} from $fromDay to $newDate');
+          final notifier = ref.read(mealControllerProvider.notifier);
+          notifier.moveMeal(
+            fromDay: fromDay,
+            toDay: newDate,
+            meal: meal,
+          );
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Moved ${meal.title} to ${_formatDay(newDate)}')),
+          );
+        } else {
+          debugPrint('[ACTION] Date unchanged, no move performed');
+        }
+      },
+    );
+  }
+
   Future<void> _handleMealDelete(DateTime day, MealInstance meal) async {
+    debugPrint('[ACTION] Delete action selected for meal: ${meal.title}');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -219,9 +264,13 @@ class _MealCalendarScreenState extends ConsumerState<MealCalendarScreen> {
       },
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      debugPrint('[ACTION] Delete cancelled');
+      return;
+    }
     if (!mounted) return;
 
+    debugPrint('[ACTION] Delete confirmed, removing meal: ${meal.title}');
     final notifier = ref.read(mealControllerProvider.notifier);
     notifier.removeMeal(day: day, meal: meal);
     

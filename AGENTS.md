@@ -14,74 +14,49 @@ The automation testing infrastructure lives at the **repository root** in:
 
 ## Target Platform
 
-We are **testing exclusively on Android** via Android Studio emulator. This is the baseline platform verification strategy:
+We are **testing exclusively on iOS Simulator** for validation tests. This is the baseline platform verification strategy:
 
-- ✅ **Necessary but not sufficient**: If it works on Android, the pure Flutter logic should port to iOS and Web with minimal adaptation
+- ✅ **Necessary but not sufficient**: If it works on iOS, the pure Flutter logic should port to Android and Web with minimal adaptation
 - ✅ **Feature validation focus**: Proves drag-and-drop, state management, and card manipulation logic works
+- ✅ **Integration test compatibility**: iOS Simulator works well with Flutter's integration_test package
 
 ## Verification: New Checkout Setup
 
 After cloning this repository, verify the toolchain is correctly installed:
 
-### 1. Install Dependencies
+### 1. Verify Flutter Environment
+
+```bash
+# Check Flutter recognizes iOS setup
+flutter doctor -v
+
+# Should show:
+# [✓] Flutter (Channel stable, ...)
+# [✓] Xcode - develop for iOS and macOS
+
+# List available simulators
+xcrun simctl list devices available
+
+# Should show at least one iPhone simulator
+```
+
+### 2. Build and Run Demo on Simulator
 
 ```bash
 # From repository root
 cd /path/to/FlutterInfiniteCalendar
 
-# Install mise-managed tooling (Node.js)
-mise install
-
-mise run bootstrap
-
-# Should show: "Available drivers: flutter-integration@2.0.3"
-# Press Ctrl+C to stop
-```
-
-### 2. Verify Flutter Integration Driver
-
-```bash
-# Check driver installation
-
-# Should show:
-# ✔ flutter-integration@2.0.3 [installed (npm)]
-```
-
-### 3. Verify Android Environment
-
-```bash
-# Check Flutter recognizes Android setup
-flutter doctor -v
-
-# Should show:
-# [✓] Android toolchain - develop for Android devices
-# [✓] Android Studio
-
-# List available emulators
-emulator -list-avds
-
-# Should show at least one AVD (e.g., "Medium_Phone_API_36.1" or "Pixel_6_API_33")
-```
-
-### 4. Build and Run Demo on Emulator
-
-```bash
-# Start emulator (in background)
-emulator -avd <your-avd-name> &
-
-# Wait ~30 seconds for boot
-
 # Navigate to a demo
 cd demo/01
 
-# Run the Flutter app
+# Run the Flutter app (simulator will auto-launch if not running)
 flutter run
 
-# App should launch on emulator successfully
+# App should launch on simulator successfully
 # Press 'q' to quit
 ```
 
-If all four steps succeed, the environment is ready for automation testing.
+If both steps succeed, the environment is ready for validation testing.
 
 ## Critical: Build Mode Requirements
 
@@ -170,53 +145,140 @@ Future<void> main() async {
 
 ## Test Architecture
 
+This project uses a **two-role testing model** to prevent conflicts and ensure clear ownership of test code.
+
+### Two Testing Roles
+
+| Role | Owns | Cannot Touch | File Pattern | Purpose |
+|------|------|--------------|--------------|---------|
+| **Tester** | Validation tests | Developer tests | `validation_XX_YY.dart` | Verify spec compliance |
+| **Developer** | Unit tests | Validation tests | `developer_*.dart` | Test implementation details |
+
+### Tester Role
+
+**Who**: Agent focused on specification validation and behavioral testing  
+**Owns**: `demo/XX/integration_test/validation_XX_YY.dart`
+
+**Responsibilities**:
+- ✅ **Create/modify validation tests** for VALIDATION_YY.md requirements
+- ✅ **Ensure tests verify behavioral contracts** from specification
+- ✅ **Report implementation bugs** when validation tests fail
+- ❌ **NEVER modify developer unit tests**
+- ❌ **NEVER modify implementation code** (only report issues)
+
+**Naming Convention**: `validation_[DEMO]_[TEST].dart`
+- `DEMO` = Demo number (01, 02, etc.)
+- `TEST` = VALIDATION_YY.md test number (01-31)
+- Example: `validation_01_01.dart` = Demo 01, VALIDATION_01.md test
+
+**Run Tests**: `./run_validation_test.sh [DEMO] [TEST]`
+
+---
+
+### Developer Role
+
+**Who**: Agent focused on implementation and debugging  
+**Owns**: `demo/XX/test/developer_*.dart`
+
+**Responsibilities**:
+- ✅ **Write unit tests** for helpers, controllers, utilities
+- ✅ **Test edge cases** and implementation-specific behavior
+- ✅ **Modify implementation code** to fix bugs
+- ✅ **Debug and fix** validation test failures by changing implementation
+- ❌ **NEVER modify validation tests**
+- ❌ **NEVER delete validation tests**
+
+**Naming Convention**: `developer_*.dart`
+- Use descriptive names for what's being tested
+- Examples: `developer_meal_controller_test.dart`, `developer_drag_logic_test.dart`
+
+**Run Tests**: `cd demo/XX && flutter test`
+
+---
+
+### Visual Overview
 
 ```
-automation/
-├── package.json           # Shared dependencies
-├── screenshots/           # Test evidence output
-└── tests/
-    ├── 01/                # Tests for demo/01/
-    │   ├── 01-hello-world.test.js
-    │   └── 02-drag-drop.test.js
-    ├── 02/                # Tests for demo/02/
-    │   ├── 01-hello-world.test.js
-    │   └── 02-drag-drop.test.js
-    └── ...
+demo/01/
+├── integration_test/          # TESTER ROLE ONLY
+│   ├── validation_01_01.dart  # Test for VALIDATION_01.md
+│   ├── validation_01_02.dart  # Test for VALIDATION_02.md
+│   └── ...                    # (DEVELOPER: READ ONLY)
+├── test/                      # DEVELOPER ROLE ONLY
+│   ├── developer_meal_controller_test.dart
+│   ├── developer_drag_logic_test.dart
+│   └── ...                    # (TESTER: HANDS OFF)
+├── lib/
+│   └── ...                    # Implementation (DEVELOPER edits)
+└── .tmp/                      # Test logs
+    └── ios_*.log
 ```
 
-**Why demo-specific folders?**
-- Different demos may use different Flutter calendar packages
-- Widget keys, selectors, and hierarchies will vary between implementations
-- Each demo's tests are **self-contained** and don't depend on other demos' test code
-- Winning demo's test folder becomes the portable asset
+---
+
+### Why Two Roles?
+
+**Problem**: When one agent modifies both validation tests and implementation code, they can:
+- Make tests pass by weakening test requirements
+- Create circular dependencies (test ↔ implementation)
+- Lose objective validation of specification compliance
+
+**Solution**: Separation of concerns
+- **Tester** defines "what correct behavior looks like" via tests
+- **Developer** makes implementation satisfy those tests
+- Neither can cheat by modifying the other's domain
 
 ### Test Execution Workflow
 
-   ```bash
-   cd /path/to/FlutterInfiniteCalendar
-   # Leave running
-   ```
+#### Running Validation Tests
 
-2. **Terminal 2**: Build PROFILE APK for target demo
-   ```bash
-   cd /path/to/FlutterInfiniteCalendar
-   DEMO=01 mise run build-demo
-   # Produces: demo/01/build/app/outputs/flutter-apk/app-profile.apk
-   ```
+From repository root:
 
-3. **Terminal 3**: Uninstall old debug version (if exists)
-   ```bash
-   adb uninstall com.example.meal_planner_demo
-   ```
+```bash
+# Run validation test 01 for demo 01
+./run_validation_test.sh 01 01
 
-4. **Terminal 3**: Run tests for specific demo
-   ```bash
-   cd /path/to/FlutterInfiniteCalendar
-   DEMO=01 mise run test
-   ```
+# Run validation test 02 for demo 01
+./run_validation_test.sh 01 02
 
-**Important:** Always use profile builds (app-profile.apk), never debug builds (app-debug.apk). Debug mode causes UI freezing and makes testing impossible.
+# Run validation test 01 for demo 02
+./run_validation_test.sh 02 01
+
+# Defaults to demo 01, test 01 if no arguments
+./run_validation_test.sh
+```
+
+**What happens**:
+1. Script checks if iOS Simulator is running, starts it if needed
+2. Changes to `demo/XX` directory
+3. Finds matching `integration_test/validation_YY_*_test.dart` file
+4. Runs test on iOS Simulator with timeout protection
+5. Logs output to `demo/XX/.tmp/ios_YYYYMMDD_HHMM_YY.log`
+6. Shows test summary and exit status
+
+**Log monitoring**:
+```bash
+# In another terminal, follow test progress
+tail -f demo/01/.tmp/ios_YYYYMMDD_HHMM_01.log
+```
+
+#### Running Unit Tests
+
+From demo directory:
+
+```bash
+# Navigate to demo
+cd demo/01
+
+# Run all unit tests
+flutter test
+
+# Run specific test file
+flutter test test/meal_controller_test.dart
+
+# Run with verbose output
+flutter test --verbose
+```
 
 ## Test Implementation Guide
 
@@ -327,17 +389,47 @@ automation/
 
 ## What Success Looks Like
 
-When automation is working correctly for a demo:
-2. `DEMO=01 mise run build-demo` produces APK at `demo/01/build/app/outputs/flutter-apk/app-profile.apk`
-4. Tests pass with green checkmarks and evidence saved to `automation/screenshots/`
-5. Console shows structured logs matching `SPEC.md` format: `[TIMESTAMP] [LEVEL] [ACTION] - {DETAILS}`
+When validation testing is working correctly for a demo:
 
-## Porting Tests to Other Repositories
+1. Simulator launches automatically when running `./run_validation_test.sh 01 01`
+2. Test runs on iOS Simulator without freezing or hanging
+3. Test completes within timeout (default 120 seconds)
+4. Logs saved to `demo/01/.tmp/ios_YYYYMMDD_HHMM_01.log` with detailed output
+5. Console shows clear pass/fail status with emoji indicators (✅/❌)
+6. Exit code 0 for pass, non-zero for fail
+
+**Example successful run**:
+```
+==========================================
+Validation Test Runner
+Demo: 01
+Test: 01
+File: integration_test/validation_01_setup_test.dart
+==========================================
+
+[14:32:15] Checking iOS Simulator status...
+[14:32:15] Simulator is already running
+[14:32:15] Found device: iPhone 16
+[14:32:15] Starting test with 120s timeout...
+Running test.......... [20s].......... [40s]... done
+
+[14:32:58] Test completed. Checking results...
+
+=== TEST OUTPUT (last 50 lines) ===
+🎉 [TEST_COMPLETE] Test 1 passed all requirements!
+All tests passed!
+
+✅ TEST PASSED!
+```
+
+## Porting Demos to Other Repositories
 
 When a demo proves successful and needs to be integrated into another repository:
 
-3. **Adapt selectors**: Update widget keys/selectors to match target repo's implementation
-4. **Update app paths**: Modify APK/app paths to point at target repo's build output
-5. **Run validation**: Execute full test suite to ensure portability
+1. **Copy implementation code**: Copy `demo/XX/lib/` to target repository
+2. **Copy validation tests**: Copy `demo/XX/integration_test/` to target repository
+3. **Copy test runner script**: Copy `./run_validation_test.sh` to target repository root
+4. **Adapt to target structure**: Update paths in script if demo isn't in `./demo/XX/` structure
+5. **Run validation**: Execute `./run_validation_test.sh` to ensure tests still pass in new environment
 
-The test **patterns** (wait strategies, drag gestures, assertion approaches) remain reusable; only the **selectors** and **paths** need adaptation.
+The validation tests provide a portable contract that ensures the implementation behaves correctly in any repository.

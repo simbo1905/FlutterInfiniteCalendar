@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:developer' as developer;
 import 'theme/app_theme.dart';
 import 'features/calendar/meal_calendar_screen.dart';
@@ -33,6 +34,17 @@ class _MealPlannerAppState extends State<MealPlannerApp> {
         title: 'Meal Planner',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        // Set locale to en_GB for Day/Month/Year format in date picker
+        locale: const Locale('en', 'GB'),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en', 'GB'),
+          Locale('en', 'US'),
+        ],
         scrollBehavior: const MaterialScrollBehavior().copyWith(
           dragDevices: {
             PointerDeviceKind.touch,

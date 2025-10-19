@@ -43,6 +43,14 @@ class MealRepository {
         );
         final dateKey = _dateKey(date);
 
+        // Skip Monday (0) and Tuesday (1) of the first week for testing
+        // This creates clear slots for validation tests to use
+        if (weekOffset == 0 && (dayOffset == 0 || dayOffset == 1)) {
+          _persistentState[dateKey] = [];
+          _workingState[dateKey] = [];
+          continue;
+        }
+
         final mealCount = _random.nextInt(4);
         final meals = <MealInstance>[];
 
