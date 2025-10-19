@@ -68,3 +68,4 @@ CLAUDE.md
 repomix-output.md
 demo/01/flutter_*.png
 demo/01/.claude/
+.claude/settings.local.json
