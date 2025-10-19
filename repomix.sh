@@ -1,0 +1,1 @@
+repomix --include 'automation/wdio.conf.js,automation/appium.config.cjs,automation/package.json,automation/tests/**/*.js,demo/01/lib/**/*.dart,demo/01/pubspec.yaml,demo/01/**/*.md,*.md,*.sh,mise.toml' --ignore '**/build/**,**/.dart_tool/**,**/node_modules/**,**/.tmp/**,**/allure-results/**,**/Pods/**,demo/01/android/**,demo/01/ios/**'
