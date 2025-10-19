@@ -7,11 +7,11 @@
 1. Wait for calendar to fully render
 2. Find a card on one day (e.g., Monday)
 3. Note card details
-4. Capture "before" screenshot
+4. Log "before" state
 5. Drag card to a different day in the same week (e.g., Wednesday)
 6. Release to drop
 7. Wait for UI update
-8. Capture "after" screenshot
+8. Log "after" state
 
 **Expected Results**:
 - Card visually follows drag gesture

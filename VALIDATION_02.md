@@ -9,10 +9,10 @@
 1. Wait for calendar to fully render with cards
 2. Identify a meal card on one day (e.g., Monday)
 3. Identify a target day (e.g., Tuesday - can be empty or populated)
-4. Capture "before" screenshot
+4. Log "before" state
 5. Drag the card from source day to target day
 6. Wait for UI to update
-7. Capture "after" screenshot
+7. Log "after" state
 8. Verify the card moved:
    - Source day has one fewer card (or is now empty)
    - Target day has the card (as first, last, or only card)
@@ -20,17 +20,17 @@
 **Part B: Horizontal Drag (Reorder Within Day)**
 1. Find a day with at least 2 meal cards
 2. Note the initial order of the first two cards
-3. Capture "before" screenshot
+3. Log "before" state
 4. Drag the first card to the right past the second card
 5. Wait for UI to update
-6. Capture "after" screenshot
+6. Log "after" state
 7. Verify the cards are now in reversed order
 
 **Expected Results**:
 - Both vertical and horizontal drag gestures are recognized (not interpreted as taps or swipes)
 - Cards visually follow the drag gesture
 - UI updates to reflect the new positions
-- Screenshots show clear before/after state changes
+- State changes are logged showing clear before/after verification
 - Console logs show `[MOVE_MEAL]` (for Part A) and `[REORDER_MEAL]` (for Part B) per `SPEC.md`
 - Test completes within 60 seconds
 

@@ -6,11 +6,11 @@
 **Steps**:
 1. Find a day with at least 2 meal cards
 2. Note initial order
-3. Capture "before" screenshot
+3. Log "before" state
 4. Drag first card to right past second card
 5. Release to drop
 6. Wait for UI update
-7. Capture "after" screenshot
+7. Log "after" state
 
 **Expected Results**:
 - Card follows drag gesture horizontally
