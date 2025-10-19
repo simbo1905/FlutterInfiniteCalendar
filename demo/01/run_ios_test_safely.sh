@@ -10,7 +10,12 @@ set -e
 # Configuration
 TEST_FILE="integration_test/validation_01_setup_test.dart"
 LOG_DIR=".tmp"
-LOG_FILE="$LOG_DIR/ios_test.log"
+
+# Generate datetime-based log filename: ios_YYYYMMDD_HHMM_XX.log
+# where XX is the test number (01 for setup test)
+DATE_TIME=$(date '+%Y%m%d_%H%M')
+LOG_FILE="$LOG_DIR/ios_${DATE_TIME}_01.log"
+
 SIMULATOR_WAIT=60
 TEST_TIMEOUT=120
 
@@ -60,6 +65,7 @@ echo "[$(current_time)] Found device: $DEVICE_ID"
 # Step 4: Run the test with timeout
 echo "[$(current_time)] Starting test with ${TEST_TIMEOUT}s timeout..."
 echo "[$(current_time)] Test output is being written to: $LOG_FILE"
+echo "[$(current_time)] To follow along: tail -f $LOG_FILE"
 echo ""
 
 # Run test in background with timeout
@@ -69,6 +75,9 @@ echo ""
 ) &
 
 TEST_PID=$!
+
+# Optional: Start tailing the log in background (user can run tail -f manually)
+echo "[$(current_time)] Tip: In another terminal, run: tail -f $LOG_FILE"
 
 # Step 5: Monitor the test (show progress dots)
 printf "Running test"
